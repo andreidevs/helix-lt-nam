@@ -115,6 +115,34 @@ def roundtrip(work, stock):
     print("[+] stock LT .hxf round-trips byte for byte")
 
 
+def staged(work, stock, outdir):
+    """The Floor port's two bring-up images on the LT, from this build: test1, stock but seg0 grown by
+    as many zero bytes as the build grows it (the cave: does the bootloader take it, and is that
+    memory free?); test2c, stock but the slots and heaps (Entries 2 and 5, the DSP memory) alone."""
+    floor = os.path.join(work, "helix-floor", "floor")
+    sys.path.insert(0, floor)
+    import build_staged
+    import l6ia
+    import patch_amp as pa
+    import stage_main
+    raw = open(stock, "rb").read()
+    data, _ = pa.load_l6ia_from_any(stock)
+    full, _ = pa.load_l6ia_from_any(os.path.join(work, "helix-floor", "build", "floor2_s4.l6ia"))
+    e0, f0 = pa.get_entry_swapped(data, 0), pa.get_entry_swapped(full, 0)
+    n = stage_main.segments(f0)[0][2] - stage_main.segments(e0)[0][2]
+    img, _, _ = l6ia.rebuild_archive(data, {0: build_staged.grow_seg0(e0, n)})
+    assert pa.get_entry_swapped(img, 1) == e0
+    build_staged.check_and_pack(img, "test1_seg0_only.hxf", raw)
+    r = subprocess.run([sys.executable, os.path.join(floor, "build_test2c.py"), stock], cwd=work,
+                       env={**os.environ, "PYTHONUTF8": "1"})
+    if r.returncode:
+        sys.exit("build_test2c.py failed")
+    for src, dst in (("test1_seg0_only.hxf", "Helix_LT_v3.80.0_TEST1_SEG0.hxf"),
+                     ("test2c_bigslot_heaps.hxf", "Helix_LT_v3.80.0_TEST2C_MEMORY.hxf")):
+        shutil.copyfile(os.path.join(work, "helix-floor", "build", src), os.path.join(outdir, dst))
+        print(f"[+] {dst}: MD5 {hashlib.md5(open(os.path.join(outdir, dst), 'rb').read()).hexdigest()}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("floor_port")
@@ -123,6 +151,7 @@ def main():
     ap.add_argument("--work", default=os.path.join(HERE, "build", "lt_port"))
     ap.add_argument("--meter", action="store_true", help="the Floor port's cycle-meter test image (nam_floor5m)")
     ap.add_argument("--diag", action="store_true", help="the Floor port's beep-code test image (nam_floor5d)")
+    ap.add_argument("--staged", action="store_true", help="also the two bring-up images (see staged())")
     a = ap.parse_args()
     stock, out, work = (os.path.abspath(p) for p in (a.stock, a.output, a.work))
     if hashlib.md5(open(stock, "rb").read()).hexdigest() != LT_MD5:
@@ -136,6 +165,8 @@ def main():
     if r.returncode:
         sys.exit("build_floor2.py failed")
     out = out.replace("NAM2_PERSONAL", "NAM2_METER" if a.meter else "NAM2_DIAG") if flags else out
+    if a.staged:
+        staged(work, stock, os.path.dirname(out))
     print(f"\nHelix LT build: {out}\nMD5 {hashlib.md5(open(out, 'rb').read()).hexdigest()}. Personal build: never share it.")
 
 

@@ -40,6 +40,31 @@ KernelCheck count (34,874 instructions a call), the same preset ID (380); Entry 
 spare (Floor 5,220). One table (0x4e words) lands in Block 3's top region instead of heap b's tail:
 the allocator's choice with the LT's addresses; still Block 3, still checked in the simulator.
 
+## First day with an LT, in this order
+
+Each step needs the previous one to have worked. All images go in with Line 6 Updater, Offline Mode.
+
+1. **Stock first.** Back up presets and IRs in HX Edit. Hold footswitches 6 + 12 while powering on: if
+   update mode comes up, install the stock `Helix_LT_v3.80.0_0x7d01f5efb.hxf` from it. If it doesn't,
+   stop here: no way back has been shown on an LT.
+2. **The canary**, `python helix-lt/canary.py <stock LT .hxf>` (`build/Helix_LT_v3.80.0_CANARY.hxf`):
+   stock with one browser item renamed, Distortion > Xenomorph Fuzz (Mono) reads **Xeno LT TEST**;
+   only Entry 0 changes, 14 bytes. It boots and shows the name: the Updater takes our images and the
+   unit runs them. Then go back to stock through update mode once, on purpose.
+3. **NAM** (`Helix_LT_v3.80.0_NAM2_PERSONAL.hxf`): boots, Amp > NAM > NAM A2 Lite is there, a capture
+   imported as a User IR plays with Model = its slot. A plain path (no split), one NAM a path.
+4. **The meter** (`--meter`, `Helix_LT_v3.80.0_NAM2_METER.hxf`): one NAM slot per DSP; the block plays
+   numbers instead of audio (it is loud: monitors down). Record a few seconds of the LT's USB input 1
+   at 48 kHz (pan the lane 100L if the capture endpoint is mono, as the Floor's is) and run
+   `python helix-lt/build/lt_port/helix-floor/floor/meter_read.py take.wav --v2` (needs ffmpeg):
+   the cycles a call, of 150,000 per block. On the Floor a plain path read ~55K (37%).
+5. **Only if NAM is silent or wrong**, the diag image (`--diag`, `Helix_LT_v3.80.0_NAM2_DIAG.hxf`):
+   where the kernel would play silence it beeps N times, then pauses (~260 ms), for its first failure
+   since boot. 1 DMA channel 0 busy; 4 a DMA failed loading the model; 5 no model (Model outside
+   1..128, or that slot holds no NAM capture); 6 a channel 0 transfer timed out; 8 the instance's
+   memory is not where the kernel expects (a split path); 9 the model ran but output 0.0; 10 no code.
+   No beep and silence: the kernel is never called. Dry guitar: no slot or SDRAM block.
+
 ## Before installing
 
 1. Back up presets and IRs in HX Edit.

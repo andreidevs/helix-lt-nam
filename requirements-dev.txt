@@ -1,3 +1,4 @@
 numpy
 pytest
 msgpack
+unicorn==2.1.4

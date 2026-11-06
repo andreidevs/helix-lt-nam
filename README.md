@@ -130,6 +130,16 @@ The results' MD5s are pinned in `tests/test_firmware.py`:
 
 Only 4 of the 15 parts of the firmware change: the main application (its model tables and the title code), the DSP program, the model list and the DSP graph library. **The bootloader is never touched**, which is what keeps [Recovery](#recovery) possible.
 
+### CustomOS features (HX Stomp, optional)
+
+`--customos` adds wisemandenny's [hx-stomp-customOS](https://github.com/wisemandenny/hx-stomp-customOS) features after the NAM steps: a CustomOS section in Global Settings with the tuner settings (Tuner Activation Hold/Press, Lock Tuner Settings), and by their switches the BPM on the Home screen (`HX_BPM=1`), each block's DSP cost in the Edit view (`HX_DSP_METER=1`) and your own boot screen (`HX_SPLASH=picture.png`, `HX_SPLASH_TEXT=...`).
+
+```sh
+HX_BPM=1 HX_DSP_METER=1 python3 build.py path/to/HX_Stomp_v3.80.0_0x103966115.hxf --customos
+```
+
+Each feature is a module in `tools/features/` and `tools/patch_menu.py` the engine: features that hook one place share it, and two writes to the same bytes fail the build. BPM and the DSP meter assemble their M4 code with Apple's clang (Command Line Tools); the boot screen converts pictures with macOS `sips` (elsewhere give a 320x240 PNG). These features ran on an HX Stomp in customOS's own build (NAM at IDs 147/148); **with this repository's NAM they have not run on a unit**, and the default build doesn't include them. [FIRMWARE_NOTES.md](FIRMWARE_NOTES.md) is customOS's map of the 3.80.0 firmware (including how the DSP can send values to the M4 in the tail of its frames), and [docs/resource-limits.md](docs/resource-limits.md) what room is left.
+
 ## Try it first, from RAM
 
 On the HX Stomp and XL you can run the built firmware from the unit's memory for one session before you install it (not on the HX Effects: the RAM loader is the Stomp's). Nothing is written to the Stomp, and turning it off and on brings back what is installed. The Stomp must have stock 3.80.0 installed.

@@ -2,7 +2,7 @@
 """Build HX Stomp, HX Stomp XL or HX Effects firmware 3.80.0 with NAM A2 Lite, from your own copy of the stock firmware.
 
 usage: python3 build.py <HX_Stomp_v3.80.0_0x103966115.hxf | HX_Stomp_XL_v3.80.0_0x103966115.hxf |
-                         HX_Effects_v3.80.0_0xd97239907.hxf> [-o out.hxf] [--no-check]
+                         HX_Effects_v3.80.0_0xd97239907.hxf> [-o out.hxf] [--no-check] [--customos]
 
 The input is Line 6's own firmware file for your unit, version 3.80.0
 (Line 6 Updater keeps a copy; see README.md). Nothing of it is in this
@@ -21,6 +21,10 @@ Steps:
      (--no-check skips it, ~2 min)
   2. tools/patch_amp.py, STEPS[unit]: the model (each block with its own
      SDRAM block), its menu entry and the IR name in the block title
+     --customos (HX Stomp only): then tools/patch_menu.py, the CustomOS features of
+     tools/features (from wisemandenny/hx-stomp-customOS): the tuner settings always,
+     BPM, the DSP meter and the boot screen by their switches (HX_BPM=1, HX_DSP_METER=1,
+     HX_SPLASH=picture, HX_SPLASH_TEXT=...; FIRMWARE_NOTES.md). Not run on a unit with this NAM.
   3. tools/patch_amp.py patch: the kernel into the SHARC boot stream
   4. tools/l6ia_verify.py: every checksum of the result
   5. tools/hxf.py pack: the .hxf
@@ -112,6 +116,13 @@ def main():
         run(py, "tools/patch_amp.py", step[0], src, dst, *step[1:])
         if src != stock:
             os.remove(src)
+        src = dst
+    if "--customos" in argv:
+        if unit != "HX_Stomp":
+            sys.exit("build.py: --customos is for the HX Stomp only (tools/patch_menu.py has its addresses)")
+        dst = os.path.join(build, "nam_lite_customos.l6ia")
+        run(py, "tools/patch_menu.py", src, dst, "--cwd", os.getcwd())
+        os.remove(src)
         src = dst
     base = src
     run(py, "tools/patch_amp.py", "patch", base, image, "--asm", asm)

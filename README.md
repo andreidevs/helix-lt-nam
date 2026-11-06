@@ -198,6 +198,23 @@ Notes:
 - Changing Model (by hand or in a snapshot) crossfades with no gap: the new capture fades in over about 5 ms while the last few milliseconds of the old one play backwards and fade out.
 - Presets store the slot number. If you move a capture to another slot, update the presets that use it.
 
+### NAM Studio: weld, chain, refine, convert
+
+`tools/nam_studio.py` opens a page in your browser (a server on 127.0.0.1 only; nothing is uploaded) that makes new A2 Lite captures on your computer, by training a Lite against bigger models (distillation, `tools/nam_refine.py`):
+
+- **Blend:** up to three amps at once, each at its own level, as one capture. Each is driven as its own interface would be (`input_level_dbu`), brought to the same loudness and lined up in time, so they add up.
+- **Chain:** pedals and an amp in series, as one capture: one NAM block for the whole chain. The level from one stage into the next follows the captures' `output_level_dbu` and `input_level_dbu`, and a ± dB knob before each stage adds drive.
+- **Refine:** a TONE3000 A2 file holds the Full and the Lite of one capture; the Lite is trained further against its own Full. The same DSP cost, closer to the Full. A capture with no Lite inside (a standard or older WaveNet, A2 Full) is trained into a Lite from scratch.
+- **Convert:** any number of `.nam` files to User IR `.wav` files (`nam2ir.py`'s), for the HX Stomp and Helix firmware.
+
+Each result plays beside its rig (A/B, on the built-in test guitar or your own 48 kHz DI, which also goes into the training), and saves as a `.nam` or straight as the `.wav` for HX Edit. The error shown is the ESR against the rig on held-out audio; the best weights seen are kept, so a refine never comes out worse than the Lite it started from. A chain or blend that sounds very far from any Lite will show a high error: a single 1,871-weight Lite can only do so much.
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install torch neural-amp-modeler      # Windows: .venv\Scripts\pip ...
+.venv/bin/python tools/nam_studio.py                 # or tools/nam_refine.py capture.nam for one refine
+```
+
 ## Limits
 
 - **At most 3 NAM A2 Lite blocks in a preset**, each with its own capture. The kernel (`tools/sharc/nam_multi.py`) has 3 model slots; a fourth block would pass its input through. They are effect blocks, so the two-amp limit doesn't count them. Run on an HX Stomp with three blocks; the XL and HX Effects builds have the same kernel and slots.

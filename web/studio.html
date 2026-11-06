@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAM Studio</title>
+<style>
+:root {
+  --bg: #121315; --panel: #1b1d20; --panel2: #23262a; --well: #0c0d0f; --line: #30343a;
+  --text: #e7e3da; --muted: #9a958b; --faint: #5f5b54;
+  --accent: #f2a33a; --accent-ink: #1a1206; --ok: #4fd1a5; --bad: #ff6b5e; --led-off: #2b2f33;
+  --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 24px rgba(0,0,0,.35);
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ecebe7; --panel: #f8f7f4; --panel2: #efede8; --well: #e2e0da; --line: #d3d0c8;
+    --text: #22201c; --muted: #6c675e; --faint: #a39e93; --accent: #c97a0c; --accent-ink: #fff;
+    --ok: #138a64; --bad: #c8392d; --led-off: #cfccc4; --shadow: 0 1px 2px rgba(0,0,0,.06);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { margin: 0; font: 700 22px/1 var(--mono); letter-spacing: .14em; }
+.brand h1 b { color: var(--accent); }
+.brand span { color: var(--muted); font-size: 13px; }
+.status { display: flex; align-items: center; gap: 8px; color: var(--muted); font: 12px var(--mono); }
+.led { width: 9px; height: 9px; border-radius: 50%; background: var(--led-off); flex: none; transition: background .2s, box-shadow .2s; }
+.led.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.led.busy { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: blink 1s infinite; }
+.led.err { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+@keyframes blink { 50% { opacity: .35; } }
+
+.tabs { display: inline-flex; background: var(--well); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 16px; flex-wrap: wrap; }
+.tabs button { border: 0; background: none; color: var(--muted); font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 9px 14px; border-radius: 7px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--panel2); color: var(--text); box-shadow: var(--shadow); }
+.hint { color: var(--muted); margin: -6px 0 16px; max-width: 760px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; }
+.label { font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.rack { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; margin-bottom: 14px; }
+.slot { flex: 1 1 220px; min-width: 210px; max-width: 360px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+.slot .top { display: flex; justify-content: space-between; align-items: center; }
+.slot .num { font: 700 30px/1 var(--mono); color: var(--line); position: absolute; right: 14px; bottom: 10px; pointer-events: none; }
+.drop { background: var(--well); border: 1px dashed var(--line); border-radius: 10px; min-height: 92px; padding: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop:focus-visible, button:focus-visible, input:focus-visible, .knob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drop .t { font: 600 13px var(--mono); letter-spacing: .06em; }
+.drop .s { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.drop.full { border-style: solid; align-items: flex-start; text-align: left; }
+.drop.full .t { font: 600 14px var(--sans); letter-spacing: 0; word-break: break-word; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.chip { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 2px 8px; }
+.chip.warn { color: var(--accent); border-color: var(--accent); }
+.controls { display: flex; align-items: center; gap: 14px; }
+.ctl { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.knob { width: 76px; height: 76px; touch-action: none; cursor: ns-resize; }
+.knob .val { font: 600 11px var(--mono); fill: var(--text); }
+.kv { font: 11px var(--mono); color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--panel2); color: var(--text); font: 700 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; border-radius: 9px; padding: 10px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.playing { border-color: var(--ok); color: var(--ok); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 14px; padding: 14px 22px; }
+.btn.small { padding: 6px 9px; font-size: 11px; }
+.btn.ghost { background: none; }
+.arrow { align-self: center; color: var(--faint); font: 700 22px var(--mono); }
+.add { flex: 0 0 120px; min-width: 120px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); background: none; cursor: pointer; font: 600 12px var(--mono); letter-spacing: .08em; }
+.add:hover { border-color: var(--accent); color: var(--text); }
+
+.grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px; }
+input[type=text] { background: var(--well); border: 1px solid var(--line); color: var(--text); border-radius: 9px; padding: 10px 12px; font: 14px var(--sans); width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { background: var(--well); color: var(--muted); border: 0; border-right: 1px solid var(--line); padding: 9px 12px; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--panel2); color: var(--text); }
+.seg small { display: block; font: 10px var(--mono); color: var(--faint); letter-spacing: 0; text-transform: none; }
+.readouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+@media (max-width: 520px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+.ro { background: var(--well); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+.ro .v { font: 600 17px var(--mono); margin-top: 2px; font-variant-numeric: tabular-nums; }
+canvas { width: 100%; height: 150px; display: block; background: var(--well); border: 1px solid var(--line); border-radius: 9px; }
+.bar { height: 4px; background: var(--well); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.log { font: 11px/1.5 var(--mono); color: var(--muted); margin-top: 10px; white-space: pre-wrap; max-height: 90px; overflow: auto; }
+.msg { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1.4em; }
+.msg.err { color: var(--bad); }
+.files { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.file { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--well); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; flex-wrap: wrap; }
+.file .n { font-weight: 600; word-break: break-word; }
+.file .d { font-size: 12px; color: var(--muted); }
+.file .d.err { color: var(--bad); }
+.big-drop { min-height: 160px; }
+footer { color: var(--faint); font-size: 12px; margin-top: 22px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><h1>NAM <b>STUDIO</b></h1><span>смесь · цепочка · переобучение · конвертер — для NAM A2 Lite на HX Stomp и Helix</span></div>
+    <div class="status"><span class="led" id="srvLed"></span><span id="srvText">сервер…</span></div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-mode="mix" aria-selected="true">Смесь</button>
+    <button role="tab" data-mode="chain" aria-selected="false">Цепочка</button>
+    <button role="tab" data-mode="refine" aria-selected="false">Переобучение</button>
+    <button role="tab" data-mode="convert" aria-selected="false">Конвертер</button>
+  </div>
+  <p class="hint" id="hint"></p>
+
+  <section id="rigView">
+    <div class="rack" id="rack"></div>
+    <div class="grid">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <span class="label">Обучение A2 Lite</span>
+          <span class="led" id="jobLed"></span>
+        </div>
+        <div class="row" style="margin-bottom:12px">
+          <label class="field"><span class="label">Имя захвата</span><input type="text" id="name" placeholder="например: Plexi + TS9"></label>
+        </div>
+        <div class="row" style="margin-bottom:14px">
+          <div class="seg" id="quality" role="group" aria-label="Качество">
+            <button data-q="quick" aria-pressed="false">Быстро<small>~3 мин</small></button>
+            <button data-q="standard" aria-pressed="true">Стандарт<small>~10 мин</small></button>
+            <button data-q="deep" aria-pressed="false">Глубоко<small>~30 мин</small></button>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="go">Склеить</button>
+          <button class="btn" id="stop" hidden>Стоп</button>
+        </div>
+        <div class="bar"><i id="bar"></i></div>
+        <div class="msg" id="jobMsg"></div>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <span class="label">Ошибка относительно связки</span>
+          <span class="kv" id="chartNote">ESR, отложенный кусок</span>
+        </div>
+        <canvas id="chart" width="560" height="150" aria-label="График ошибки"></canvas>
+        <div class="readouts">
+          <div class="ro"><div class="label">Шаг</div><div class="v" id="roStep">—</div></div>
+          <div class="ro"><div class="label">Было</div><div class="v" id="roBefore">—</div></div>
+          <div class="ro"><div class="label">Лучшая</div><div class="v" id="roBest">—</div></div>
+          <div class="ro"><div class="label">Время</div><div class="v" id="roTime">—</div></div>
+        </div>
+        <div class="row">
+          <button class="btn" id="hearRig">Слушать связку</button>
+          <button class="btn" id="hearResult" disabled>Слушать результат</button>
+          <button class="btn" id="ab" disabled title="Переключает связку и результат на том же месте">A / B</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <a class="btn" id="saveNam" aria-disabled="true">Сохранить .nam</a>
+          <a class="btn" id="saveWav" aria-disabled="true">Для Helix / Stomp (.wav)</a>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between">
+        <span class="label">Сигнал для прослушивания и обучения</span>
+        <div class="row">
+          <div class="seg" id="diSeg" role="group" aria-label="Источник">
+            <button data-di="demo" aria-pressed="true">Тестовая гитара</button>
+            <button data-di="mine" aria-pressed="false">Мой DI (.wav)</button>
+          </div>
+          <button class="btn small" id="hearDry">Сухой сигнал</button>
+        </div>
+      </div>
+      <div class="msg" id="diMsg">Встроенная синтетическая гитара: ноты, аккорды, глушения. Свой DI (48 кГц, .wav) звучит честнее и тоже идёт в обучение.</div>
+    </div>
+  </section>
+
+  <section id="convertView" hidden>
+    <div class="panel">
+      <div class="drop big-drop" id="convDrop" tabindex="0" role="button" aria-label="Выбрать .nam файлы">
+        <div class="t">ПЕРЕТАЩИТЕ .NAM ФАЙЛЫ</div>
+        <div class="s">любое количество · A2 с TONE3000 или A2 Lite · или нажмите, чтобы выбрать</div>
+      </div>
+      <div class="files" id="convFiles"></div>
+    </div>
+    <p class="hint" style="margin-top:14px">Файл .wav — это не звук, а веса модели в виде User IR. В HX Edit импортируйте его в слот User IR и поставьте ручку Model блока NAM A2 Lite на номер слота. Захват без Lite внутри (стандартный или A2 Full) сначала нужно ужать во вкладке «Переобучение».</p>
+  </section>
+
+  <footer>Всё считается на этом компьютере (сервер tools/nam_studio.py на 127.0.0.1), ничего никуда не отправляется. Захваты не входят в проект: соблюдайте условия их авторов.</footer>
+</div>
+
+<input type="file" id="pick" accept=".nam" hidden>
+<input type="file" id="pickMany" accept=".nam" multiple hidden>
+<input type="file" id="pickDi" accept=".wav,audio/wav" hidden>
+<audio id="player"></audio>
+
+<script>
+const $ = s => document.querySelector(s);
+const MODES = {
+  mix: { slots: 3, max: 3, go: 'Склеить', hint: 'До трёх усилителей звучат одновременно, как три головы в одной комнате. Уровень каждого — ручкой; громкость и фаза выравниваются сами. Результат — один захват A2 Lite.' },
+  chain: { slots: 2, max: 5, go: 'Собрать цепочку', hint: 'Педали и усилитель по порядку слева направо, как на полу. Уровни между ступенями берутся из метаданных захватов (выход педали → вход следующей ступени); ручка добавляет ± дБ перед ступенью. Результат — один захват A2 Lite: вся цепочка в одном блоке.' },
+  refine: { slots: 1, max: 1, go: 'Переобучить', hint: 'Захват A2 с TONE3000 (внутри Full и Lite): Lite дообучается по своей Full и становится ближе к ней — та же нагрузка DSP. Захват без Lite (стандартный, A2 Full) ужимается в Lite с нуля.' },
+};
+let mode = 'mix', quality = 'standard', diId = null, job = null, jobTimer = null;
+const rigs = { mix: [], chain: [], refine: [] };
+
+function blankSlot(kind) { return { cap: null, value: kind === 'chain' ? 0 : 50 }; }
+for (const m of ['mix', 'chain', 'refine']) for (let i = 0; i < MODES[m].slots; i++) rigs[m].push(blankSlot(m));
+
+// ---------------------------------------------------------------- server
+async function api(path, body, headers = {}) {
+  const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', body, headers });
+  if (!r.ok) {
+    let e = {}; try { e = await r.json(); } catch {}
+    const err = new Error(e.error || r.statusText); err.data = e; throw err;
+  }
+  return r;
+}
+async function ping() {
+  try { await fetch('/api/job/none'); $('#srvLed').className = 'led on'; $('#srvText').textContent = '127.0.0.1 · готов'; }
+  catch { $('#srvLed').className = 'led err'; $('#srvText').textContent = 'сервер не отвечает: запустите tools/nam_studio.py'; }
+}
+
+// ---------------------------------------------------------------- knob
+function knob(slot, onchange) {
+  const chain = mode === 'chain';
+  const min = chain ? -24 : 0, max = chain ? 24 : 100;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 76 76'); svg.setAttribute('class', 'knob'); svg.setAttribute('tabindex', '0');
+  svg.setAttribute('role', 'slider'); svg.setAttribute('aria-valuemin', min); svg.setAttribute('aria-valuemax', max);
+  svg.setAttribute('aria-label', chain ? 'Подстройка перед ступенью, дБ' : 'Уровень');
+  const arc = (a0, a1, r) => {
+    const p = a => [38 + r * Math.cos(a), 38 + r * Math.sin(a)];
+    const [x0, y0] = p(a0), [x1, y1] = p(a1);
+    return `M${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  };
+  const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25;
+  svg.innerHTML = `<path d="${arc(A0, A1, 30)}" stroke="var(--line)" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path class="fill" stroke="var(--accent)" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <circle cx="38" cy="38" r="21" fill="var(--panel2)" stroke="var(--line)"/>
+    <line class="ptr" x1="38" y1="19" x2="38" y2="25" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+    <text class="val" x="38" y="42" text-anchor="middle"></text>`;
+  const draw = () => {
+    const v = slot.value, f = (v - min) / (max - min), a = A0 + f * (A1 - A0);
+    const from = chain ? A0 + 0.5 * (A1 - A0) : A0;
+    const [s, e] = a >= from ? [from, a] : [a, from];
+    svg.querySelector('.fill').setAttribute('d', Math.abs(e - s) < 1e-3 ? '' : arc(s, e, 30));
+    svg.querySelector('.ptr').setAttribute('transform', `rotate(${(a - Math.PI * 1.5) * 180 / Math.PI} 38 38)`);
+    svg.querySelector('.val').textContent = chain ? (v > 0 ? '+' : '') + v.toFixed(1) : Math.round(v);
+    svg.setAttribute('aria-valuenow', v);
+  };
+  const set = v => { slot.value = Math.min(max, Math.max(min, Math.round(v * 2) / 2)); draw(); onchange && onchange(); };
+  let y0 = null, v0 = 0;
+  svg.addEventListener('pointerdown', e => { y0 = e.clientY; v0 = slot.value; svg.setPointerCapture(e.pointerId); });
+  svg.addEventListener('pointermove', e => { if (y0 !== null) set(v0 + (y0 - e.clientY) * (max - min) / 180); });
+  svg.addEventListener('pointerup', () => { y0 = null; });
+  svg.addEventListener('wheel', e => { e.preventDefault(); set(slot.value - Math.sign(e.deltaY) * (chain ? 0.5 : 2)); }, { passive: false });
+  svg.addEventListener('dblclick', () => set(chain ? 0 : 50));
+  svg.addEventListener('keydown', e => {
+    const step = chain ? 0.5 : 2;
+    if (['ArrowUp', 'ArrowRight'].includes(e.key)) { set(slot.value + step); e.preventDefault(); }
+    if (['ArrowDown', 'ArrowLeft'].includes(e.key)) { set(slot.value - step); e.preventDefault(); }
+  });
+  draw();
+  return svg;
+}
+
+// ---------------------------------------------------------------- rack
+function renderRack() {
+  const rack = $('#rack'); rack.innerHTML = '';
+  const slots = rigs[mode];
+  slots.forEach((slot, i) => {
+    if (mode === 'chain' && i) { const a = document.createElement('div'); a.className = 'arrow'; a.textContent = '→'; rack.append(a); }
+    const el = document.createElement('div'); el.className = 'panel slot';
+    const title = mode === 'chain' ? (i === slots.length - 1 ? 'Ступень ' + (i + 1) + ' · обычно усилитель' : 'Ступень ' + (i + 1)) : 'Захват ' + String(i + 1).padStart(2, '0');
+    el.innerHTML = `<div class="top"><span class="label">${title}</span><span class="row" style="gap:4px"></span></div>
+      <div class="drop" tabindex="0" role="button"></div>
+      <div class="controls"></div><div class="num">${String(i + 1).padStart(2, '0')}</div>`;
+    const tools = el.querySelector('.top .row');
+    if (mode === 'chain') {
+      const mk = (t, label, fn, dis) => { const b = document.createElement('button'); b.className = 'btn small ghost'; b.textContent = t; b.title = label; b.setAttribute('aria-label', label); b.disabled = dis; b.onclick = fn; tools.append(b); };
+      mk('◀', 'Раньше в цепочке', () => { [slots[i - 1], slots[i]] = [slots[i], slots[i - 1]]; renderRack(); }, i === 0);
+      mk('▶', 'Позже в цепочке', () => { [slots[i + 1], slots[i]] = [slots[i], slots[i + 1]]; renderRack(); }, i === slots.length - 1);
+      mk('✕', 'Убрать ступень', () => { slots.splice(i, 1); if (slots.length < 2) slots.push(blankSlot('chain')); renderRack(); }, false);
+    }
+    const drop = el.querySelector('.drop');
+    if (slot.cap) {
+      const c = slot.cap; drop.classList.add('full');
+      drop.innerHTML = `<div class="t"></div><div class="chips"></div>`;
+      drop.querySelector('.t').textContent = c.name;
+      const chips = drop.querySelector('.chips');
+      const chip = (t, warn) => { const s = document.createElement('span'); s.className = 'chip' + (warn ? ' warn' : ''); s.textContent = t; chips.append(s); };
+      chip(c.has_lite ? 'A2: Full + Lite' : 'без Lite · ' + c.kind.replace(/ \(no Lite inside\)/, '').replace('weights', 'весов'), !c.has_lite);
+      if (c.dbu != null) chip('вход ' + c.dbu.toFixed(1) + ' dBu');
+      if (c.loudness != null) chip('громкость ' + c.loudness.toFixed(1) + ' dB');
+    } else {
+      drop.innerHTML = `<div class="t">ПЕРЕТАЩИТЕ .NAM</div><div class="s">A2 с TONE3000, стандартный или Lite · или нажмите</div>`;
+    }
+    const choose = () => { $('#pick').onchange = e => { if (e.target.files[0]) load(slot, e.target.files[0]); e.target.value = ''; }; $('#pick').click(); };
+    drop.onclick = choose;
+    drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } };
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) load(slot, f); };
+    const ctl = el.querySelector('.controls');
+    if (mode !== 'refine') {
+      const k = document.createElement('div'); k.className = 'ctl';
+      k.append(knob(slot));
+      const lab = document.createElement('div'); lab.className = 'label'; lab.textContent = mode === 'chain' ? '± дБ перед' : 'Уровень';
+      k.append(lab); ctl.append(k);
+    }
+    const hear = document.createElement('button'); hear.className = 'btn'; hear.textContent = 'Слушать'; hear.disabled = !slot.cap;
+    hear.onclick = () => play(hear, { mode: 'mix', ids: [slot.cap.id], levels: [1], source: 'rig' });
+    const led = document.createElement('span'); led.className = 'led' + (slot.cap ? ' on' : ''); led.title = slot.cap ? 'загружен' : 'пусто';
+    ctl.append(hear, led);
+    rack.append(el);
+  });
+  if (mode === 'chain' && slots.length < MODES.chain.max) {
+    const add = document.createElement('button'); add.className = 'add'; add.textContent = '+ ступень';
+    add.onclick = () => { slots.splice(slots.length - 1, 0, blankSlot('chain')); renderRack(); };
+    rack.append(add);
+  }
+  $('#go').textContent = MODES[mode].go;
+  updateGo();
+}
+
+async function load(slot, file) {
+  const msg = $('#jobMsg'); msg.className = 'msg'; msg.textContent = 'Загружаю ' + file.name + '…';
+  try {
+    const r = await api('/api/capture', await file.text(), { 'X-Filename': encodeURIComponent(file.name) });
+    slot.cap = await r.json(); msg.textContent = '';
+    if (!$('#name').value && mode === 'refine') $('#name').value = slot.cap.name + ' HD Lite';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = file.name + ': ' + e.message; }
+  renderRack();
+}
+
+function rigRequest() {
+  const slots = rigs[mode].filter(s => s.cap);
+  const r = { mode: mode === 'chain' ? 'chain' : 'mix', ids: slots.map(s => s.cap.id), di: diId };
+  if (mode === 'chain') r.trims = slots.map(s => s.value); else r.levels = slots.map(s => mode === 'refine' ? 1 : s.value / 100);
+  return r;
+}
+function updateGo() {
+  const n = rigs[mode].filter(s => s.cap).length;
+  const ok = mode === 'refine' ? n === 1 : mode === 'chain' ? n >= 2 : n >= 1;
+  const running = job && job.state === 'running';
+  $('#go').disabled = !ok || running; $('#hearRig').disabled = !n;
+}
+
+// ---------------------------------------------------------------- audio
+const player = $('#player'); let playingBtn = null; const urls = {};
+async function fetchAudio(req) {
+  const key = JSON.stringify(req);
+  if (!urls[key]) urls[key] = URL.createObjectURL(await (await api('/api/hear', JSON.stringify(req), { 'Content-Type': 'application/json' })).blob());
+  return urls[key];
+}
+function stopAudio() { player.pause(); if (playingBtn) playingBtn.classList.remove('playing'); playingBtn = null; }
+player.onended = stopAudio;
+async function play(btn, req) {
+  if (playingBtn === btn) return stopAudio();
+  stopAudio(); const label = btn.textContent; btn.textContent = '…';
+  try { player.src = await fetchAudio(req); await player.play(); playingBtn = btn; btn.classList.add('playing'); }
+  catch (e) { $('#jobMsg').className = 'msg err'; $('#jobMsg').textContent = e.message; }
+  btn.textContent = label;
+}
+$('#hearRig').onclick = () => play($('#hearRig'), { ...rigRequest(), source: 'rig' });
+$('#hearResult').onclick = () => play($('#hearResult'), { source: 'result', job: job.id, di: diId });
+$('#hearDry').onclick = () => play($('#hearDry'), { source: 'dry', di: diId });
+let abSide = 'result';
+$('#ab').onclick = async () => {
+  const t = player.currentTime;
+  abSide = abSide === 'result' ? 'rig' : 'result';
+  const req = abSide === 'rig' ? { ...rigRequest(), source: 'rig' } : { source: 'result', job: job.id, di: diId };
+  const src = await fetchAudio(req); stopAudio();
+  player.src = src; player.currentTime = t; await player.play(); playingBtn = $('#ab'); $('#ab').classList.add('playing');
+  $('#ab').textContent = abSide === 'rig' ? 'A / B · связка' : 'A / B · результат';
+};
+
+// ---------------------------------------------------------------- DI
+document.querySelectorAll('#diSeg button').forEach(b => b.onclick = () => {
+  if (b.dataset.di === 'demo') { diId = null; setSeg('#diSeg', b); $('#diMsg').textContent = 'Встроенная синтетическая гитара.'; for (const k in urls) delete urls[k]; return; }
+  $('#pickDi').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const r = await (await api('/api/di', await f.arrayBuffer())).json();
+      diId = r.id; setSeg('#diSeg', b); for (const k in urls) delete urls[k];
+      $('#diMsg').textContent = `${f.name}: ${r.seconds.toFixed(1)} с — звучит в прослушивании и идёт в обучение.`;
+    } catch (err) { $('#diMsg').textContent = f.name + ': ' + err.message; }
+  };
+  $('#pickDi').click();
+});
+function setSeg(sel, btn) { document.querySelectorAll(sel + ' button').forEach(x => x.setAttribute('aria-pressed', x === btn)); }
+document.querySelectorAll('#quality button').forEach(b => b.onclick = () => { quality = b.dataset.q; setSeg('#quality', b); });
+
+// ---------------------------------------------------------------- training
+$('#go').onclick = async () => {
+  const req = { ...rigRequest(), quality, name: $('#name').value };
+  $('#jobMsg').className = 'msg'; $('#jobMsg').textContent = 'Готовлю учителей…';
+  try {
+    const { id } = await (await api('/api/job', JSON.stringify(req), { 'Content-Type': 'application/json' })).json();
+    job = { id, state: 'running', history: [] }; for (const k in urls) if (k.includes('"result"')) delete urls[k];
+    ['#hearResult', '#ab'].forEach(s => $(s).disabled = true); setSave(false);
+    $('#stop').hidden = false; $('#jobLed').className = 'led busy'; updateGo(); poll();
+  } catch (e) { $('#jobMsg').className = 'msg err'; $('#jobMsg').textContent = e.message; }
+};
+$('#stop').onclick = () => job && api(`/api/job/${job.id}/stop`, '{}');
+function setSave(on) {
+  for (const [s, ext] of [['#saveNam', 'nam'], ['#saveWav', 'wav']]) {
+    const a = $(s); a.setAttribute('aria-disabled', !on);
+    if (on) a.href = `/api/job/${job.id}/${ext}`; else a.removeAttribute('href');
+    a.style.opacity = on ? 1 : .4; a.style.pointerEvents = on ? '' : 'none';
+  }
+}
+const pct = e => e == null ? '—' : (100 * e).toFixed(2) + '%';
+async function poll() {
+  clearTimeout(jobTimer);
+  let j; try { j = await (await api('/api/job/' + job.id)).json(); } catch { jobTimer = setTimeout(poll, 1500); return; }
+  job = j;
+  $('#roStep').textContent = j.step ? `${j.step}/${j.steps}` : '—';
+  $('#roBefore').textContent = pct(j.before); $('#roBest').textContent = pct(j.best);
+  $('#roTime').textContent = fmtTime(j.elapsed);
+  $('#bar').style.width = (100 * (j.step || 0) / j.steps) + '%';
+  $('#log').textContent = j.log.join('\n'); $('#log').scrollTop = 1e9;
+  drawChart(j.history, j.before);
+  if (j.state === 'running') {
+    const eta = j.step ? j.elapsed / j.step * (j.steps - j.step) : null;
+    $('#jobMsg').textContent = j.step ? `Обучаю… осталось ~${fmtTime(eta)}` : 'Готовлю учителей…';
+    jobTimer = setTimeout(poll, 1000); return;
+  }
+  $('#stop').hidden = true; updateGo();
+  if (j.state === 'done') {
+    $('#jobLed').className = 'led on'; setSave(true); ['#hearResult', '#ab'].forEach(s => $(s).disabled = false);
+    $('#jobMsg').className = 'msg';
+    $('#jobMsg').textContent = j.before != null ? `Готово: ошибка ${pct(j.before)} → ${pct(j.best)}.` : `Готово: ошибка ${pct(j.best)} относительно связки.`;
+  } else { $('#jobLed').className = 'led err'; $('#jobMsg').className = 'msg err'; $('#jobMsg').textContent = j.error || 'не получилось'; }
+}
+function fmtTime(s) { if (s == null) return '—'; s = Math.round(s); return s < 60 ? s + ' с' : Math.floor(s / 60) + ' мин ' + String(s % 60).padStart(2, '0') + ' с'; }
+function drawChart(h, before) {
+  const c = $('#chart'), g = c.getContext('2d'), dpr = devicePixelRatio || 1;
+  const W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr; g.scale(dpr, dpr);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  g.clearRect(0, 0, W, H);
+  const pts = h.slice(); if (!pts.length) return;
+  const ys = pts.map(p => p[1]).concat(before != null ? [before] : []);
+  const lo = Math.log10(Math.min(...ys) * 0.9), hi = Math.log10(Math.max(...ys) * 1.1);
+  const X = s => 8 + (W - 16) * s / (job.steps || 1), Y = v => 10 + (H - 24) * (hi - Math.log10(v)) / ((hi - lo) || 1);
+  g.font = '10px ' + css('--mono'); g.fillStyle = css('--faint'); g.strokeStyle = css('--line'); g.lineWidth = 1;
+  for (const v of [Math.pow(10, lo), Math.pow(10, (lo + hi) / 2), Math.pow(10, hi)]) {
+    g.beginPath(); g.moveTo(8, Y(v)); g.lineTo(W - 8, Y(v)); g.stroke(); g.fillText(pct(v), 10, Y(v) - 3);
+  }
+  if (before != null) { g.setLineDash([4, 4]); g.strokeStyle = css('--muted'); g.beginPath(); g.moveTo(8, Y(before)); g.lineTo(W - 8, Y(before)); g.stroke(); g.setLineDash([]); }
+  g.strokeStyle = css('--accent'); g.lineWidth = 2; g.beginPath();
+  pts.forEach(([s, v], k) => k ? g.lineTo(X(s), Y(v)) : g.moveTo(X(s), Y(v))); g.stroke();
+  let best = Infinity; g.strokeStyle = css('--ok'); g.lineWidth = 1.5; g.beginPath();
+  pts.forEach(([s, v], k) => { best = Math.min(best, v, before ?? Infinity); k ? g.lineTo(X(s), Y(best)) : g.moveTo(X(s), Y(best)); }); g.stroke();
+}
+
+// ---------------------------------------------------------------- converter
+const conv = $('#convDrop');
+conv.onclick = () => $('#pickMany').click();
+conv.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#pickMany').click(); } };
+$('#pickMany').onchange = e => { convert([...e.target.files]); e.target.value = ''; };
+conv.ondragover = e => { e.preventDefault(); conv.classList.add('over'); };
+conv.ondragleave = () => conv.classList.remove('over');
+conv.ondrop = e => { e.preventDefault(); conv.classList.remove('over'); convert([...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.nam'))); };
+async function convert(files) {
+  for (const f of files) {
+    const row = document.createElement('div'); row.className = 'file';
+    row.innerHTML = `<div><div class="n"></div><div class="d">конвертирую…</div></div><div class="row"></div>`;
+    row.querySelector('.n').textContent = f.name; $('#convFiles').prepend(row);
+    const d = row.querySelector('.d'), acts = row.querySelector('.row');
+    try {
+      const blob = await (await api('/api/convert', await f.text(), { 'X-Filename': encodeURIComponent(f.name) })).blob();
+      const a = document.createElement('a'); a.className = 'btn small'; a.textContent = 'Скачать .wav';
+      a.href = URL.createObjectURL(blob); a.download = f.name.replace(/\.nam$/i, '') + '.wav'; acts.append(a);
+      d.textContent = 'User IR для NAM A2 Lite, 2048 отсчётов';
+    } catch (e) {
+      d.className = 'd err'; d.textContent = e.message;
+      if (e.data && e.data.distill) {
+        const b = document.createElement('button'); b.className = 'btn small'; b.textContent = 'Ужать в Lite';
+        b.onclick = () => { selectMode('refine'); load(rigs.refine[0], f); }; acts.append(b);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- modes
+function selectMode(m) {
+  mode = m; stopAudio();
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.mode === m));
+  $('#rigView').hidden = m === 'convert'; $('#convertView').hidden = m !== 'convert';
+  $('#hint').textContent = m === 'convert' ? 'Перетащите захваты — получите файлы User IR (.wav) для прошивки NAM A2 Lite на HX Stomp и Helix. Всё на этом компьютере.' : MODES[m].hint;
+  if (m !== 'convert') renderRack();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => selectMode(b.dataset.mode));
+selectMode('mix'); setSave(false); ping();
+addEventListener('resize', () => job && drawChart(job.history || [], job.before));
+</script>
+</body>
+</html>

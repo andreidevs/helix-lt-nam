@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 pytestmark = [pytest.mark.firmware, pytest.mark.slow]
 
-BUILT_MD5 = "ecb8d773333a6cd2b81545e8a6542cce"   # not run on an LT
+BUILT_MD5 = "8330973f8b445050b826c093eb4c48b4"   # the title-site fix; ecb8d773 blue-screened an LT
 
 
 def test_build(tmp_path):

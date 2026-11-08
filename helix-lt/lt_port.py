@@ -11,6 +11,12 @@ replaced by the LT's, each found by matching the stock Floor and LT images:
   the title sites -0x132..-0x1c6; each site's code compared instruction for instruction
   (branch targets aside), the block counter's DSP struct offsets included. seg0 ends at
   0x100112a8 (Floor 0x10011870): the cave starts there.
+- Title site A is 2 mod 4 on the LT (0x280abf9e; the Floor's 0x280ac164 is 4-aligned), so the
+  Floor's `ldr.w pc,[pc,#0]; .word caveA` there reads its literal 2 bytes early and jumps to junk:
+  the first NAM build blue-screened an LT at boot (its DSP half alone booted). Site A does
+  `bl RELAY; nop; nop` instead (LR is dead there: a bl precedes it) and the relay, shared with
+  site B, enters a dispatcher that picks caveA when LR = site A + 4 | 1 (site B's LR is always
+  its own bl's return, 0x280ad22d).
 - DSP program (Entry 2): heap a (Block 0) 0xa words lower, heap b and the free top of Block 3
   0xe lower, same sizes; primitive 0x128's record names its PM code 7 words lower. Blob 0, Heap 6,
   Heap 7, the User IR store and heap c are where they are on the Floor.
@@ -78,7 +84,56 @@ PATCHES = [
      "IR_PATH, NON_IR, IR_NAME = 0x280AC35C, 0x280ABFA6, 0x280AC7BC", 1),
     ("ir_title.py", "B_IR, B_RET = 0x280AD38E, 0x280AD382", "B_IR, B_RET = 0x280AD242, 0x280AD236", 1),
     ("ir_title.py", "RELAY = 0x28135078", "RELAY = 0x2813BA10", 1),
+    # site A is 2 mod 4 on the LT: bl to the relay and a dispatcher on LR (see the docstring)
+    ("ir_title.py", '    a.ldrpc("w_b_ir")\n    a.align4()\n',
+     '    a.ldrpc("w_b_ir")\n'
+     '    # LT: site A does `bl RELAY` (2 mod 4: no aligned ldr.w pc fits its 8 bytes); the relay comes here\n'
+     '    a.label("disp")\n'
+     '    a.lit(3, "w_site_a_lr")\n'
+     '    a.h(0x4573)                          # cmp r3, lr\n'
+     '    a.b("eq", "caveA")\n'
+     '    a.b("al", "caveB")\n'
+     '    a.align4()\n', 1),
+    ("ir_title.py", '("w_b_ret", B_RET), ("w_b_ir", B_IR)):',
+     '("w_b_ret", B_RET), ("w_b_ir", B_IR), ("w_site_a_lr", SITE_A + 4)):', 1),
+    ("ir_title.py", 'return code, a.labels["caveA"], a.labels["caveB"]',
+     'return code, a.labels["caveA"], a.labels["disp"]', 1),
+    ("ir_title.py", '    return {SITE_A: struct.pack("<HHI", 0xF8DF, 0xF000, ca | 1),\n',
+     '    assert RELAY % 4 == 0, "the relay\'s ldr.w pc needs a 4-aligned address"\n'
+     '    h1, h2 = struct.unpack("<2H", patch_amp.thumb_bw(SITE_A, RELAY))\n'
+     '    return {SITE_A: struct.pack("<4H", h1, h2 | 0x4000, 0xBF00, 0xBF00),   # bl RELAY; nop; nop\n', 1),
+    ("test_ir_title.py", '    cpu.r[6 if cave == "A" else 5] = BLK\n',
+     '    cpu.r[6 if cave[0] == "A" else 5] = BLK\n'
+     '    cpu.r[14] = (t.SITE_A + 4) | 1 if cave == "A>" else 0x280AD22D   # LR: site A\'s bl, site B\'s own\n', 1),
+    ("test_ir_title.py", '    to = cpu.run((ca if cave == "A" else cb) | 1)',
+     '    to = cpu.run((ca if cave == "A" else cb) | 1)     # "A>": site A through the relay', 1),
+    ("test_ir_title.py", '        ("A: an effect -> stock", go("A", 2, PID)[0], t.NON_IR),\n',
+     '        ("A: an effect -> stock", go("A", 2, PID)[0], t.NON_IR),\n'
+     '        ("A via the relay: NAM amp -> IR name branch", go("A>", 12, PID), (t.IR_NAME, 0)),\n'
+     '        ("A via the relay: other amp -> stock", go("A>", 12, 77)[0], t.NON_IR),\n'
+     '        ("A via the relay: IR block -> stock IR path", go("A>", 15, 5)[0], t.IR_PATH),\n', 1),
 ]
+
+
+def check_sites(work):
+    """Decode the built Entry 0 at title site A and the relay: bl RELAY there, and the relay's
+    ldr.w pc reading its literal from a 4-aligned address."""
+    from capstone import Cs, CS_ARCH_ARM, CS_MODE_MCLASS, CS_MODE_THUMB
+    import struct
+    import ir_title
+    import patch_amp as pa
+    import stage_main
+    data, _ = pa.load_l6ia_from_any(os.path.join(work, "helix-floor", "build", "floor2_s4.l6ia"))
+    im = stage_main.Image(pa.get_entry_swapped(data, 0))
+    md = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_MCLASS)
+    md.detail = True
+    bl =next(md.disasm(im.rd(ir_title.SITE_A, 4), ir_title.SITE_A))
+    assert (bl.mnemonic, bl.operands[0].imm) == ("bl", ir_title.RELAY), f"site A: {bl.mnemonic} {bl.op_str}"
+    ld = next(md.disasm(im.rd(ir_title.RELAY, 4), ir_title.RELAY))
+    assert ld.mnemonic == "ldr.w" and ld.op_str.startswith("pc, [pc"), f"relay: {ld.mnemonic} {ld.op_str}"
+    disp = struct.unpack("<I", im.rd(ir_title.RELAY + 4, 4))[0]
+    assert ir_title.RELAY % 4 == 0 and disp & 1 and stage_main.CAVE <= disp < stage_main.CAVE_END
+    print(f"[+] title site A {ir_title.SITE_A:#x}: bl {ir_title.RELAY:#x}; relay -> dispatcher {disp & ~1:#x}")
 
 
 def make_tree(src, work):
@@ -164,6 +219,8 @@ def main():
                         *flags], cwd=work, env={**os.environ, "PYTHONUTF8": "1"})
     if r.returncode:
         sys.exit("build_floor2.py failed")
+    sys.path[:0] = [os.path.join(work, "tools"), os.path.join(work, "helix-floor", "floor")]
+    check_sites(work)
     out = out.replace("NAM2_PERSONAL", "NAM2_METER" if a.meter else "NAM2_DIAG") if flags else out
     if a.staged:
         staged(work, stock, os.path.dirname(out))

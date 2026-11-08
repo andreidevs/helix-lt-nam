@@ -1,4 +1,4 @@
-# NAM A2 Lite on the Helix LT (experimental, not run on an LT yet)
+# NAM A2 Lite on the Helix LT (experimental: boots on one LT)
 
 The Helix LT's firmware 3.80.0 is the Helix Floor's relinked: the same models, composites and
 DDR2 map, with its own path graphs, main application and DSP program
@@ -8,7 +8,14 @@ the build that ran on a Floor) with every Floor address replaced by the LT's. `l
 holds the replacements, each one found by matching the stock Floor and LT images and checked
 against the code it points at.
 
-> **Status: built, never run on an LT.** On the Floor, at this commit (one unit; the port's
+> **Status: this build (`8330973f`) boots on one LT and shows Amp > NAM > NAM A2 Lite** (2026-11-08);
+> playing a capture, two NAM per path and the meter are not reported yet. On that LT: the canary, TEST1_SEG0 and
+> TEST2C_MEMORY boot and play as stock; the first NAM build (`ecb8d773`) blue-screened at boot,
+> while its DSP half alone (Entries 2, 4, 5 with Entry 0 stock, two images) booted. The cause,
+> found in the image: title site A is 2 mod 4 on the LT, so the Floor's `ldr.w pc,[pc,#0]` there read
+> its target 2 bytes early (`lt_port.py` docstring); this build goes through a `bl` and the relay.
+>
+> On the Floor, at this commit (one unit; the port's
 > FINDINGS.md, and [Suddl3's recall test](https://github.com/Suddl3/hx-stomp-nam-lite/blob/floor-a2-lite-recall-test/docs/research/HELIX_FLOOR_RECALL.md)
 > on an earlier build): a NAM block costs ~35% of a DSP (52.8K cycles a call; declared 3,600), two
 > on one DSP play (20 minutes of checks, none bad), presets recall. **The UI freezes of earlier
@@ -34,7 +41,7 @@ It copies the Floor port to `helix-lt/build/lt_port`, applies the LT's addresses
 that doesn't match exactly stops the build), checks that the stock LT file round-trips through the
 pack, then runs the Floor port's own build there (its bit-exact KernelCheck in the simulator, the
 partition sizes, the guard tests): about 5 minutes. The result is
-`helix-lt/build/Helix_LT_v3.80.0_NAM2_PERSONAL.hxf` (MD5 `ecb8d773333a6cd2b81545e8a6542cce`,
+`helix-lt/build/Helix_LT_v3.80.0_NAM2_PERSONAL.hxf` (MD5 `8330973f8b445050b826c093eb4c48b4`,
 pinned in `tests/test_helix_lt.py`). **Never share it**: it is Line 6's firmware.
 
 `--meter` builds the Floor port's cycle-meter test image instead (each NAM block plays its own

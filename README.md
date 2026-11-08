@@ -130,6 +130,16 @@ The results' MD5s are pinned in `tests/test_firmware.py`:
 
 Only 4 of the 15 parts of the firmware change: the main application (its model tables and the title code), the DSP program, the model list and the DSP graph library. **The bootloader is never touched**, which is what keeps [Recovery](#recovery) possible.
 
+### CustomOS features (HX Stomp, optional)
+
+`--customos` adds wisemandenny's [hx-stomp-customOS](https://github.com/wisemandenny/hx-stomp-customOS) features after the NAM steps: a CustomOS section in Global Settings with the tuner settings (Tuner Activation Hold/Press, Lock Tuner Settings), and by their switches the BPM on the Home screen (`HX_BPM=1`), each block's DSP cost in the Edit view (`HX_DSP_METER=1`) and your own boot screen (`HX_SPLASH=picture.png`, `HX_SPLASH_TEXT=...`).
+
+```sh
+HX_BPM=1 HX_DSP_METER=1 python3 build.py path/to/HX_Stomp_v3.80.0_0x103966115.hxf --customos
+```
+
+Each feature is a module in `tools/features/` and `tools/patch_menu.py` the engine: features that hook one place share it, and two writes to the same bytes fail the build. BPM and the DSP meter assemble their M4 code with Apple's clang (Command Line Tools); the boot screen converts pictures with macOS `sips` (elsewhere give a 320x240 PNG). These features ran on an HX Stomp in customOS's own build (NAM at IDs 147/148); **with this repository's NAM they have not run on a unit**, and the default build doesn't include them. [FIRMWARE_NOTES.md](FIRMWARE_NOTES.md) is customOS's map of the 3.80.0 firmware (including how the DSP can send values to the M4 in the tail of its frames), and [docs/resource-limits.md](docs/resource-limits.md) what room is left.
+
 ## Try it first, from RAM
 
 On the HX Stomp and XL you can run the built firmware from the unit's memory for one session before you install it (not on the HX Effects: the RAM loader is the Stomp's). Nothing is written to the Stomp, and turning it off and on brings back what is installed. The Stomp must have stock 3.80.0 installed.
@@ -187,6 +197,23 @@ Notes:
 - The Model knob shows slot numbers. The block's title shows the name of the IR in that slot (the name HX Edit gave it).
 - Changing Model (by hand or in a snapshot) crossfades with no gap: the new capture fades in over about 5 ms while the last few milliseconds of the old one play backwards and fade out.
 - Presets store the slot number. If you move a capture to another slot, update the presets that use it.
+
+### NAM Studio: weld, chain, refine, convert
+
+`tools/nam_studio.py` opens a page in your browser (a server on 127.0.0.1 only; nothing is uploaded) that makes new A2 Lite captures on your computer, by training a Lite against bigger models (distillation, `tools/nam_refine.py`):
+
+- **Blend:** up to three amps at once, each at its own level, as one capture. Each is driven as its own interface would be (`input_level_dbu`), brought to the same loudness and lined up in time, so they add up.
+- **Chain:** pedals and an amp in series, as one capture: one NAM block for the whole chain. The level from one stage into the next follows the captures' `output_level_dbu` and `input_level_dbu`, and a ± dB knob before each stage adds drive.
+- **Refine:** a TONE3000 A2 file holds the Full and the Lite of one capture; the Lite is trained further against its own Full. The same DSP cost, closer to the Full. A capture with no Lite inside (a standard or older WaveNet, A2 Full) is trained into a Lite from scratch.
+- **Convert:** any number of `.nam` files to User IR `.wav` files (`nam2ir.py`'s), for the HX Stomp and Helix firmware.
+
+Each result plays beside its rig (A/B, on the built-in test guitar or your own 48 kHz DI, which also goes into the training), and saves as a `.nam` or straight as the `.wav` for HX Edit. The error shown is the ESR against the rig on held-out audio; the best weights seen are kept, so a refine never comes out worse than the Lite it started from. A chain or blend that sounds very far from any Lite will show a high error: a single 1,871-weight Lite can only do so much.
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install torch neural-amp-modeler      # Windows: .venv\Scripts\pip ...
+.venv/bin/python tools/nam_studio.py                 # or tools/nam_refine.py capture.nam for one refine
+```
 
 ## Limits
 

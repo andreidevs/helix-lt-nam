@@ -28,3 +28,4 @@ The on-unit test tools these notes use (`hx_ctl.py`, `hx_smoke.py`, `hx_reamp.py
 | [STOCK_BITEXACT_OPT.md](STOCK_BITEXACT_OPT.md) | making stock effects cheaper with bit-identical output, and stock models' dsp_cost against measured cycles |
 | [HELIX_FLOOR_FEASIBILITY.md](HELIX_FLOOR_FEASIBILITY.md) | a first look at the Helix Floor / LT 3.80.0 |
 | [HELIX_FLOOR_KERNEL_COST.md](HELIX_FLOOR_KERNEL_COST.md) | the modelled cost of the Floor's layout, with code and data all in Block 3 |
+| [HELIX_LT_FIRST_LOOK.md](HELIX_LT_FIRST_LOOK.md) | the Helix LT 3.80.0 against the Floor: the same firmware relinked, what is where, what the Floor port needs mapped |

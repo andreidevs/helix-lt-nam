@@ -9,5 +9,7 @@ __pycache__/
 .DS_Store
 .venv/
 .pytest_cache/
+.claude/
+floor-port/
 !tools/ramboot/*.bin
 tools/*.hex

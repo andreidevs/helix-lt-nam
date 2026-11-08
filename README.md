@@ -1,6 +1,37 @@
-# NAM A2 Lite for the HX Stomp, HX Stomp XL and HX Effects
+# NAM A2 Lite for the Helix LT, HX Stomp, HX Stomp XL and HX Effects
 
-This repository adds **Neural Amp Modeler (NAM) A2 Lite** to the stock Line 6 firmware 3.80.0 of the HX Stomp, HX Stomp XL and HX Effects. NAM captures then run on the unit's own DSP, like any other block, with a tone stack after the model.
+This repository adds **Neural Amp Modeler (NAM) A2 Lite** to the stock Line 6 firmware 3.80.0 of the **Helix LT**, HX Stomp, HX Stomp XL and HX Effects. NAM captures then run on the unit's own DSP, like any other amp block.
+
+It is a fork of [nocaseguy/hx-stomp-nam-lite](https://github.com/nocaseguy/hx-stomp-nam-lite) (the HX Stomp, XL and HX Effects builds, unchanged here) that adds the **Helix LT** ([helix-lt/](helix-lt/README.md)) and **NAM Studio** (making and converting captures on your computer).
+
+## Helix LT
+
+> **Experimental. Runs on one Helix LT** (2026-11-08): it boots, Amp → NAM → NAM A2 Lite is in the menu, and a capture plays. Two NAM blocks on one path and the real DSP load are not confirmed on an LT yet (on the Helix Floor, two play and one costs ~35% of a DSP). Installing modified firmware is at your own risk.
+
+The LT's firmware is the Helix Floor's relinked, so the LT build is [savedadodo's Helix Floor port](https://github.com/savedadodo/helix-floor-nam-lite) with every Floor address replaced by the LT's ([helix-lt/lt_port.py](helix-lt/lt_port.py)). You build it yourself from your own copy of Line 6's firmware; no firmware is in this repository, and the built file must not be shared.
+
+**You need:** a Helix LT on firmware 3.80.0, Line 6's stock `Helix_LT_v3.80.0_0x7d01f5efb.hxf` (MD5 `7505704bd858864e38147e776b3cb7b2`, from Line 6 Updater or line6.com), Python 3.10+ with `pip install numpy capstone`, git, Line 6 Updater and HX Edit.
+
+```sh
+git clone https://github.com/andreidevs/helix-lt-nam
+cd helix-lt-nam
+git clone https://github.com/savedadodo/helix-floor-nam-lite floor-port
+git -C floor-port checkout 29aea8169d93151b25db61bf1140969de9d7b916
+python helix-lt/lt_port.py floor-port path/to/Helix_LT_v3.80.0_0x7d01f5efb.hxf
+```
+
+About 5 minutes; it writes `helix-lt/build/Helix_LT_v3.80.0_NAM2_PERSONAL.hxf`, MD5 `8330973f8b445050b826c093eb4c48b4` (the build checks the stock file's MD5 first, so yours comes out the same).
+
+**Install:**
+
+1. Back up presets and IRs in HX Edit, then close it.
+2. **Check that you can get back first:** power off, hold **footswitches 6 + 12** (MODE and TAP) while powering on: update mode. In Line 6 Updater, Offline Mode, install the stock file. If update mode doesn't come up, don't go on.
+3. The same way, install `Helix_LT_v3.80.0_NAM2_PERSONAL.hxf`.
+4. Convert a capture to a `.wav` ([Use](#use), or NAM Studio's Convert tab), import it in HX Edit as a User IR, add **Amp → NAM → NAM A2 Lite** and set **Model** to that IR's slot. Start with one NAM block per path.
+
+If it doesn't boot (a blue screen, "Boot Failure", stuck at the logo), go back to stock with step 2: that is how the LT above was recovered. Step-by-step, the test images, the cycle meter and the diag beep codes: [helix-lt/README.md](helix-lt/README.md); in Russian: [helix-lt/INSTALL_RU.md](helix-lt/INSTALL_RU.md). Not the Helix Floor (see savedadodo's port) or Rack.
+
+## HX Stomp, HX Stomp XL and HX Effects
 
 **Not a programmer? Use the setup page: [nocaseguy.github.io/hx-stomp-nam-lite/web/](https://nocaseguy.github.io/hx-stomp-nam-lite/web/).** It builds the firmware from your own Line 6 file, converts your captures and guides you through every step, all in your browser, with nothing to install and nothing uploaded. See [The setup page](#the-setup-page-no-install).
 
@@ -12,7 +43,9 @@ This repository adds **Neural Amp Modeler (NAM) A2 Lite** to the stock Line 6 fi
 | **HX Stomp XL** | `HX_Stomp_XL_v3.80.0_0x103966115.hxf`<br>`329e3a26d60d3de1988b6785fa833ee1` | Amp → NAM | **NAM runs on an XL** (earlier builds; photo below). This ten-knob build has not run on an XL yet; its DSP program, model list and DSP graphs are byte for byte the HX Stomp's. |
 | **HX Effects** | `HX_Effects_v3.80.0_0xd97239907.hxf`<br>`7c2ebdf1bffb6bcc5f89dda97f91e40c` | Distortion → Mono | **Runs.** An owner ran the previous build on an HX Effects (with their browser, knob pop-up and scribble strip fixes, PRs #6 and #9). This one adds only the loudness step to the DSP code and hasn't run on an HX Effects yet. See [HX Effects](#hx-effects). |
 
-Not the Helix Floor, LT or Rack: their firmware is a different design. Only firmware 3.80.0: the build refuses any other file.
+| **Helix LT** | `Helix_LT_v3.80.0_0x7d01f5efb.hxf`<br>`7505704bd858864e38147e776b3cb7b2` | Amp → NAM | **Runs on one LT** (boots, plays a capture). Built by `helix-lt/lt_port.py`, not `build.py`: see [Helix LT](#helix-lt). |
+
+The rest of this README is about the HX Stomp, XL and HX Effects (`build.py`); the Helix LT is in [Helix LT](#helix-lt) and [helix-lt/](helix-lt/README.md). Not the Helix Floor or Rack. Only firmware 3.80.0: the builds refuse any other file.
 
 The block, its ten knobs and the DSP kernel are the same on all three units. What differs:
 
@@ -298,6 +331,8 @@ docs/research/                working notes: measurements on the unit, studies, 
 
 - **Med Hamza**: the photo of NAM A2 Lite running on an HX Stomp XL.
 - **Scott** ([scottlynn73/hx-effects-nam-lite](https://github.com/scottlynn73/hx-effects-nam-lite)): the first HX Effects port, which the HX Effects support here builds on.
+- **Derek Bui** ([nocaseguy/hx-stomp-nam-lite](https://github.com/nocaseguy/hx-stomp-nam-lite)): the project this fork is built on: the SHARC assembler and simulator, the NAM A2 Lite kernel, the HX Stomp, XL and HX Effects builds.
+- **savedadodo** ([savedadodo/helix-floor-nam-lite](https://github.com/savedadodo/helix-floor-nam-lite)): the Helix Floor port, which the Helix LT build runs with the LT's addresses.
 - [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) by Steven Atkinson: the model format NAM A2 Lite runs.
 
 ## Licence

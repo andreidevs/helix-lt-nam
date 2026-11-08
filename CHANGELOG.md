@@ -2,6 +2,11 @@
 
 Major changes, newest first. The repository has no version numbers, so each entry is dated and names its commit. Status labels follow the README: "ran on" means a person ran that build on that unit.
 
+## 2026-11-08
+
+- **Helix LT** (`c9b90bc`, [helix-lt/](helix-lt/README.md)). `helix-lt/lt_port.py` builds savedadodo's Helix Floor port with the LT's addresses. The build 8330973f ran on a Helix LT: it boots, Amp → NAM → NAM A2 Lite is in the menu, a capture plays. The first build (ecb8d773) showed a blue screen at boot: on the LT one of the IR-title patch sites is not 4-aligned, so the jump there read a wrong address; it now goes through a `bl` and a relay. The canary and the two bring-up images also ran on that LT. Two NAM blocks per path and the real DSP load aren't confirmed on an LT yet.
+- **NAM Studio** (`bac7d24`, [README](README.md#nam-studio-weld-chain-refine-convert)). `tools/nam_studio.py`, a page on 127.0.0.1: blend up to three captures into one A2 Lite, chain pedals and an amp, refine a TONE3000 A2 file's Lite against its own Full, convert `.nam` files to User IR `.wav` files. Converting needs only numpy; training needs torch and neural-amp-modeler.
+
 ## 2026-11-06
 
 - **Loudness normalisation.** The converter (`tools/nam2ir.py` and the web page) stores a capture's loudness in the `.wav`, and the amp brings its output to −18 dB, as the NAM plugin's Normalized mode does. `.wav` files from older converters play as before. A capture converted again plays at a new volume. The converter also refuses captures not trained at 48 kHz and models that aren't the A2 shape. Builds: HX Stomp a37659d0 (ran on an HX Stomp from RAM; test suite 48 pass, 0 fail, 1 skip), HX Stomp XL 8918ab60 (not run on an XL), HX Effects 2efb9879 (not run on an HX Effects).

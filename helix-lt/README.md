@@ -55,15 +55,17 @@ instructions a call), preset ID (380) and DSP cost (3,600); Entry 2 has 5,384 by
 ## First day with an LT, in this order
 
 Each step needs the previous one to have worked. All images go in with Line 6 Updater, Offline Mode.
+Steps 2 and 3 brought the port up and all passed on the first LT; they are optional now, but they
+tell you where a failure is if the NAM build doesn't boot on yours.
 
 1. **Stock first.** Back up presets and IRs in HX Edit. Hold footswitches 6 + 12 while powering on: if
    update mode comes up, install the stock `Helix_LT_v3.80.0_0x7d01f5efb.hxf` from it. If it doesn't,
-   stop here: no way back has been shown on an LT.
-2. **The canary**, `python helix-lt/canary.py <stock LT .hxf>` (`build/Helix_LT_v3.80.0_CANARY.hxf`):
+   stop here (on the first LT it did, and it brought the unit back from a build that didn't boot).
+2. **The canary** (optional), `python helix-lt/canary.py <stock LT .hxf>` (`build/Helix_LT_v3.80.0_CANARY.hxf`):
    stock with one browser item renamed, Distortion > Xenomorph Fuzz (Mono) reads **Xeno LT TEST**;
    only Entry 0 changes, 14 bytes. It boots and shows the name: the Updater takes our images and the
    unit runs them. Then go back to stock through update mode once, on purpose.
-3. **The two bring-up images** (`lt_port.py ... --staged`), as the Floor port was brought up; each
+3. **The two bring-up images** (optional; `lt_port.py ... --staged`), as the Floor port was brought up; each
    should behave exactly as stock:
    - `Helix_LT_v3.80.0_TEST1_SEG0.hxf`: stock, but the app's first segment grown by as many zero bytes
      as the NAM build grows it. Boots and runs normally: the bootloader takes the bigger segment and
@@ -90,9 +92,9 @@ Each step needs the previous one to have worked. All images go in with Line 6 Up
 ## Before installing
 
 1. Back up presets and IRs in HX Edit.
-2. **Rehearse the recovery on stock firmware first.** On the Floor: hold footswitches 6 + 12 while
-   powering on (update mode), then Line 6 Updater, Offline Mode, the stock file. Nobody has tried
-   that on an LT; if it doesn't give update mode on yours, don't install.
+2. **Rehearse the recovery on stock firmware first:** hold footswitches 6 + 12 while powering on
+   (update mode), then Line 6 Updater, Offline Mode, the stock file. It worked on the first LT; if it
+   doesn't give update mode on yours, don't install.
 3. Install with Line 6 Updater, Offline Mode, choosing the built file.
 
 Entry 1 (the main application's second copy) stays stock, as on the Floor.

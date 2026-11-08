@@ -41,7 +41,7 @@ expected build.py line.
 
 helix-lt/lt_port.py builds on savedadodo's Helix Floor port,
 helix-floor-nam-lite (https://github.com/savedadodo/helix-floor-nam-lite,
-commit c7cd0bac, GPL-3.0-or-later): the build runs that port's own code with
+commit 29aea81, GPL-3.0-or-later): the build runs that port's own code with
 the Helix LT's addresses; none of its files are in this repository.
 
 Photo docs/hx-stomp-xl-amp-nam.jpg: Med Hamza, used with credit.

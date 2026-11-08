@@ -26,7 +26,7 @@ import shutil
 import subprocess
 import sys
 
-FLOOR_PORT = "c7cd0bacaf7e08c0de2b5fedfccb05d13826e9f0"
+FLOOR_PORT = "29aea8169d93151b25db61bf1140969de9d7b916"
 LT_MD5 = "7505704bd858864e38147e776b3cb7b2"
 FLOOR_MD5 = "805caa03e8a30fd6ff7892f32ed5a9f4"
 HERE = os.path.dirname(os.path.abspath(__file__))

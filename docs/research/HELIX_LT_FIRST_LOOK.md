@@ -101,3 +101,14 @@ From the Floor's run: one NAM block costs ~37% of a DSP in a plain path, more in
 (keep NAM out of split paths), and the declared cost there (2700) is too low. Install: Line 6
 Updater in Offline Mode. Floor recovery: footswitches 6 + 12 at power-on (update mode), then the
 stock file. On the LT, try that recovery on the stock firmware before installing any build.
+
+## 2026-11-08: the Floor port at 29aea81
+
+The port's 2026-11-07 commit fixes the UI freezes (the kernel masked P9I each call, taking it for
+external-port DMA channel 0's interrupt; both units' stock DSP programs route P9I to link port 1,
+the DSP-to-DSP link, and give neither DMA channel an interrupt), declares 3,600 per block (~35%
+measured, 52.8K cycles a call) and plays two NAM per DSP on the Floor. Its "52% in a split path"
+was a gain on the meter tone, not a slower block. Nothing in it names a new Floor address: the
+LT's 34 replacements apply unchanged. The LT's DSP program loads the same PICR words as the
+Floor's (0x0A821C66 and 0x000DDC13 found, as on the Floor), so its interrupts are routed the same
+way and the fix holds for it.

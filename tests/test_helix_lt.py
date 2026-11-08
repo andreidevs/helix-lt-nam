@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 pytestmark = [pytest.mark.firmware, pytest.mark.slow]
 
-BUILT_MD5 = "c98ed165392d22a979e94906a96035e9"   # not run on an LT
+BUILT_MD5 = "ecb8d773333a6cd2b81545e8a6542cce"   # not run on an LT
 
 
 def test_build(tmp_path):

@@ -3,25 +3,30 @@
 The Helix LT's firmware 3.80.0 is the Helix Floor's relinked: the same models, composites and
 DDR2 map, with its own path graphs, main application and DSP program
 ([HELIX_LT_FIRST_LOOK.md](../docs/research/HELIX_LT_FIRST_LOOK.md)). So this build is
-**savedadodo's Floor port** ([helix-floor-nam-lite @ c7cd0bac](https://github.com/savedadodo/helix-floor-nam-lite/tree/c7cd0bacaf7e08c0de2b5fedfccb05d13826e9f0/helix-floor),
+**savedadodo's Floor port** ([helix-floor-nam-lite @ 29aea81](https://github.com/savedadodo/helix-floor-nam-lite/tree/29aea8169d93151b25db61bf1140969de9d7b916/helix-floor),
 the build that ran on a Floor) with every Floor address replaced by the LT's. `lt_port.py`
 holds the replacements, each one found by matching the stock Floor and LT images and checked
 against the code it points at.
 
-> **Status: built, never run on an LT.** On the Floor (one unit, [Suddl3's test](https://github.com/Suddl3/hx-stomp-nam-lite/blob/floor-a2-lite-recall-test/docs/research/HELIX_FLOOR_RECALL.md)):
-> one NAM block per path plays and its presets recall; one block costs ~37% of a DSP in a plain
-> path and overloads in a split path (keep NAM out of split paths); two NAM blocks on one path
-> overload; a control freeze happened twice, cause unknown. Expect the same on the LT, or worse.
+> **Status: built, never run on an LT.** On the Floor, at this commit (one unit; the port's
+> FINDINGS.md, and [Suddl3's recall test](https://github.com/Suddl3/hx-stomp-nam-lite/blob/floor-a2-lite-recall-test/docs/research/HELIX_FLOOR_RECALL.md)
+> on an earlier build): a NAM block costs ~35% of a DSP (52.8K cycles a call; declared 3,600), two
+> on one DSP play (20 minutes of checks, none bad), presets recall. **The UI freezes of earlier
+> builds are fixed:** the kernel masked interrupt P9I for each call, believing it was external-port
+> DMA channel 0's, but both units' stock DSP programs route P9I to link port 1 (the link between
+> the two DSPs); the kernel now leaves interrupts alone (93 minutes of play, no freeze; the old
+> kernel froze 3 times in 48). The LT's DSP program routes its interrupts the same way (the same
+> PICR words as the Floor's).
 
 ## Build
 
 Needs Python 3.10+ with `numpy` and `capstone`, a checkout of the Floor port at
-`c7cd0bacaf7e08c0de2b5fedfccb05d13826e9f0`, and Line 6's stock `Helix_LT_v3.80.0_0x7d01f5efb.hxf`
+`29aea8169d93151b25db61bf1140969de9d7b916`, and Line 6's stock `Helix_LT_v3.80.0_0x7d01f5efb.hxf`
 (MD5 `7505704bd858864e38147e776b3cb7b2`).
 
 ```sh
 git clone https://github.com/savedadodo/helix-floor-nam-lite floor-port
-git -C floor-port checkout c7cd0bacaf7e08c0de2b5fedfccb05d13826e9f0
+git -C floor-port checkout 29aea8169d93151b25db61bf1140969de9d7b916
 python helix-lt/lt_port.py floor-port path/to/Helix_LT_v3.80.0_0x7d01f5efb.hxf
 ```
 
@@ -29,16 +34,16 @@ It copies the Floor port to `helix-lt/build/lt_port`, applies the LT's addresses
 that doesn't match exactly stops the build), checks that the stock LT file round-trips through the
 pack, then runs the Floor port's own build there (its bit-exact KernelCheck in the simulator, the
 partition sizes, the guard tests): about 5 minutes. The result is
-`helix-lt/build/Helix_LT_v3.80.0_NAM2_PERSONAL.hxf` (MD5 `c98ed165392d22a979e94906a96035e9`,
+`helix-lt/build/Helix_LT_v3.80.0_NAM2_PERSONAL.hxf` (MD5 `ecb8d773333a6cd2b81545e8a6542cce`,
 pinned in `tests/test_helix_lt.py`). **Never share it**: it is Line 6's firmware.
 
 `--meter` builds the Floor port's cycle-meter test image instead (each NAM block plays its own
 call's cycles, `floor/meter_read.py` reads them from a recording); `--diag` its beep-code image.
 
-The LT build against the Floor build that ran: the same four entries change, the same steady
-KernelCheck count (34,874 instructions a call), the same preset ID (380); Entry 2 has 5,272 bytes
-spare (Floor 5,220). One table (0x4e words) lands in Block 3's top region instead of heap b's tail:
-the allocator's choice with the LT's addresses; still Block 3, still checked in the simulator.
+The LT build against the Floor's: the Floor port at this commit, built here from the stock Floor
+file, gives `f4338695c5fa965f9100a0d82e632b7e`, its NOMASK_C3600 image, the one on the Floor now.
+The LT build changes the same four entries, with the same steady KernelCheck count (34,874
+instructions a call), preset ID (380) and DSP cost (3,600); Entry 2 has 5,384 bytes spare.
 
 ## First day with an LT, in this order
 
@@ -60,12 +65,14 @@ Each step needs the previous one to have worked. All images go in with Line 6 Up
      block slot made normal, heaps a and b shrunk to match). Boots, presets with two amps per path
      play on both paths. If one of these fails, the NAM build would fail the same way.
 4. **NAM** (`Helix_LT_v3.80.0_NAM2_PERSONAL.hxf`): boots, Amp > NAM > NAM A2 Lite is there, a capture
-   imported as a User IR plays with Model = its slot. A plain path (no split), one NAM a path.
-5. **The meter** (`--meter`, `Helix_LT_v3.80.0_NAM2_METER.hxf`): one NAM slot per DSP; the block plays
-   numbers instead of audio (it is loud: monitors down). Record a few seconds of the LT's USB input 1
-   at 48 kHz (pan the lane 100L if the capture endpoint is mono, as the Floor's is) and run
-   `python helix-lt/build/lt_port/helix-floor/floor/meter_read.py take.wav --v2` (needs ffmpeg):
-   the cycles a call, of 150,000 per block. On the Floor a plain path read ~55K (37%).
+   imported as a User IR plays with Model = its slot. Start with one NAM a path; two on one path
+   play on the Floor at this commit (the 3,600 cost lets the unit refuse what won't fit).
+5. **The meter** (`--meter`, `Helix_LT_v3.80.0_NAM2_METER.hxf`): the block plays numbers instead of
+   audio (it is loud: monitors down). Record a few seconds of the LT's USB input 1 at 48 kHz exactly
+   (pan the lane 100L if the capture endpoint is mono, as the Floor's is) and run the Floor port's
+   `helix-floor/floor/meter_read.py take.wav --v4` (needs ffmpeg; in the build's work tree):
+   the cycles a call, of 150,000 per block, corrected for the gain after the block. The Floor reads
+   ~52.8K (35%).
 6. **Only if NAM is silent or wrong**, the diag image (`--diag`, `Helix_LT_v3.80.0_NAM2_DIAG.hxf`):
    where the kernel would play silence it beeps N times, then pauses (~260 ms), for its first failure
    since boot. 1 DMA channel 0 busy; 4 a DMA failed loading the model; 5 no model (Model outside

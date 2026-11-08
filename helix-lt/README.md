@@ -1,4 +1,4 @@
-# NAM A2 Lite on the Helix LT (experimental: boots on one LT)
+# NAM A2 Lite on the Helix LT (experimental: runs on one LT)
 
 The Helix LT's firmware 3.80.0 is the Helix Floor's relinked: the same models, composites and
 DDR2 map, with its own path graphs, main application and DSP program
@@ -8,8 +8,8 @@ the build that ran on a Floor) with every Floor address replaced by the LT's. `l
 holds the replacements, each one found by matching the stock Floor and LT images and checked
 against the code it points at.
 
-> **Status: this build (`8330973f`) boots on one LT and shows Amp > NAM > NAM A2 Lite** (2026-11-08);
-> playing a capture, two NAM per path and the meter are not reported yet. On that LT: the canary, TEST1_SEG0 and
+> **Status: this build (`8330973f`) runs on one LT: it boots, shows Amp > NAM > NAM A2 Lite and a
+> capture plays** (2026-11-08); two NAM per path and the meter are not reported yet. On that LT: the canary, TEST1_SEG0 and
 > TEST2C_MEMORY boot and play as stock; the first NAM build (`ecb8d773`) blue-screened at boot,
 > while its DSP half alone (Entries 2, 4, 5 with Entry 0 stock, two images) booted. The cause,
 > found in the image: title site A is 2 mod 4 on the LT, so the Floor's `ldr.w pc,[pc,#0]` there read

@@ -1,3 +1,5 @@
+**English** · [Русский](README.ru.md)
+
 # NAM A2 Lite for Line 6 Helix LT
 
 **helix-lt-nam** adds a Neural Amp Modeler (NAM) A2 Lite block to Line 6 Helix LT firmware 3.80.0. The block runs captures on the Helix LT's DSP. The project also includes **NAM Studio**, a local app for blending, chaining, refining and converting captures.

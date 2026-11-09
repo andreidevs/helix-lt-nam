@@ -5,7 +5,7 @@ Major changes, newest first. The repository has no version numbers, so each entr
 ## 2026-11-08
 
 - **Helix LT** (`c9b90bc`, [helix-lt/](helix-lt/README.md)). `helix-lt/lt_port.py` builds savedadodo's Helix Floor port with the LT's addresses. The build 8330973f ran on a Helix LT: it boots, Amp → NAM → NAM A2 Lite is in the menu, a capture plays. The first build (ecb8d773) showed a blue screen at boot: on the LT one of the IR-title patch sites is not 4-aligned, so the jump there read a wrong address; it now goes through a `bl` and a relay. The canary and the two bring-up images also ran on that LT. Two NAM blocks per path and the real DSP load aren't confirmed on an LT yet.
-- **NAM Studio** (`bac7d24`, [README](README.md#nam-studio-weld-chain-refine-convert)). `tools/nam_studio.py`, a page on 127.0.0.1: blend up to three captures into one A2 Lite, chain pedals and an amp, refine a TONE3000 A2 file's Lite against its own Full, convert `.nam` files to User IR `.wav` files. Converting needs only numpy; training needs torch and neural-amp-modeler.
+- **NAM Studio** (`bac7d24`, [README](README.md#nam-studio)). `tools/nam_studio.py`, a page on 127.0.0.1: blend up to three captures into one A2 Lite, chain pedals and an amp, refine a TONE3000 A2 file's Lite against its own Full, convert `.nam` files to User IR `.wav` files. Converting needs only numpy; training needs torch and neural-amp-modeler.
 
 ## 2026-11-06
 

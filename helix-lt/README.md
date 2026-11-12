@@ -47,6 +47,33 @@ pinned in `tests/test_helix_lt.py`). **Never share it**: it is Line 6's firmware
 `--meter` builds the Floor port's cycle-meter test image instead (each NAM block plays its own
 call's cycles, `floor/meter_read.py` reads them from a recording); `--diag` its beep-code image.
 
+### Four blocks (`--layers`)
+
+`lt_port.py --layers` adds `helix-lt/lt_layers.py`'s exact replacements to the Floor port's
+`nam_floor5.py`, `stage_model.py` and `stage_main.py` and builds
+`Helix_LT_v3.80.0_NAM4_LAYERS.hxf` (MD5 `225a88d936a51203043767e91177a505`; `--meter` and `--diag`
+work with it too, `_METER` / `_DIAG` in the name). The build adds four models on the one kernel:
+
+| Block | Model | Preset ID | Layer limit | DSP cost | Measured on the LT |
+| --- | --- | --- | --- | --- | --- |
+| NAM A2 Lite | 863 | 380 | 23 | 3,650 | 54,304 cycles a call, 36.2% |
+| NAM Lite 20 | 864 | 382 | 20 | 3,300 | 49,144, 32.8% |
+| NAM Lite 16 | 865 | 516 | 16 | 2,950 | 43,864, 29.2% |
+| NAM Lite 14 | 866 | 572 | 14 | 2,770 | 41,208, 27.5% |
+
+- **Skipping layers.** The converter writes the layers a capture uses, P / 32, into IR header word 7
+  (0 in older files: all 23). The kernel does not compute layers at or past P, but still runs every
+  DMA job and event count, so the queue behaves as for 23 layers. The output is bit for bit the same
+  as computing the zero layers (simulator, P = 20, 16, 14, 10, 7, 4, 1).
+- **The limit.** Each model's graph sets instance word 16 to `0x4E4C0000 | limit` at creation (a
+  kind-2 member init, as stock blobs set their members' constants). A capture with more layers than
+  the limit plays silence. An untagged word (memory not cleared) means no limit.
+- The IR-title cave compares preset IDs with `cmp r3, #id`, so each ID is a Thumb-2 immediate: 381
+  and 383 are not, 382, 516 and 572 are.
+- The 23-layer call costs 0.4% more than the one-block build's (the layer check).
+- Line 6's HX Edit does not know IDs 382, 516 and 572. HX Edit NAM v0.5.0 does, with
+  `HX_EDIT_NAM_LAYERS=1`.
+
 The LT build against the Floor's: the Floor port at this commit, built here from the stock Floor
 file, gives `f4338695c5fa965f9100a0d82e632b7e`, its NOMASK_C3600 image, the one on the Floor now.
 The LT build changes the same four entries, with the same steady KernelCheck count (34,874
@@ -103,4 +130,13 @@ Entry 1 (the main application's second copy) stays stock, as on the Floor.
 
 As on the Floor port: Amp > NAM > NAM A2 Lite; captures converted with this repository's converter
 (`tools/nam2ir.py` or the setup page) and imported as User IRs in HX Edit; Model = the IR slot.
-HX Edit can drop NAM blocks when it rewrites a preset: edit NAM presets on the unit.
+
+### Preset compatibility
+
+HX Edit can drop NAM blocks when it rewrites a whole preset because it does not know this build's
+model ID (380). Edit NAM presets on the LT and use HX Edit to import User IRs.
+
+On the Floor, an unknown model ID can make the entire preset load as empty. Reinstalling the build
+that knew the ID brought the preset back. If this happens on the LT, leave the preset unsaved and
+return to the build it was saved with. Back up presets and IRs before switching firmware. Before
+moving to a build with a different NAM ID, migrate copies of your NAM presets and keep the originals.

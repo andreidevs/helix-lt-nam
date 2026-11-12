@@ -77,3 +77,37 @@ def test_a_lite_only_capture_is_refused(tmp_path):
     p.write_text(json.dumps(a2(3, np.random.default_rng(2), 0.1)))
     with pytest.raises(SystemExit, match="no bigger model"):
         nr.models(json.loads(p.read_text()))
+
+
+@pytest.mark.parametrize("with_lite", [True, False], ids=["from the Lite", "from scratch"])
+def test_a_light_capture_is_a_padded_a2_lite(tmp_path, with_lite):
+    import nam_lite
+    rng = np.random.default_rng(4)
+    full, lite = a2(8, rng, 0.3), a2(3, rng, 0.3)
+    subs = [{"max_value": 0.5, "model": lite}, {"max_value": 1, "model": full}] if with_lite else [{"max_value": 1, "model": full}]
+    path = tmp_path / "a2.nam"
+    path.write_text(json.dumps({"architecture": "SlimmableContainer", "version": "0.7.0", "sample_rate": 48000,
+                                "metadata": {"name": "test"}, "config": {"submodels": subs}}))
+    out, before, after = nr.refine(str(path), 20, seconds=2.0, log=lambda s: None, lr=1e-3, segment=2048, layers=16)
+    assert nam_pack.a2_mismatch(out["config"], 3) is None and len(out["weights"]) == 1871
+    assert nam_lite.layer_count(out["weights"]) == 16
+    assert out["metadata"]["nam_light"] == {"layers": 16, "of": 23} and out["metadata"]["name"] == "test [16 layers]"
+    assert np.isfinite(after) and np.isfinite(before) == with_lite
+    # the padded file plays as the 16-layer net it holds (to float rounding: torch picks conv paths by length)
+    from nam.models import init_from_nam
+    from nam.models._from_nam import _init_wavenet
+    m = init_from_nam(out).eval()
+    short = _init_wavenet(nr.prefix_config(out["config"], 16), 48000).eval()
+    short.load_state_dict({k: v for k, v in m.state_dict().items() if k in short.state_dict()})
+    short._net._head_scale = m._net._head_scale
+    x = rng.normal(0, 0.1, 6000).astype(np.float32)
+    torch.testing.assert_close(nr.run(m, x, torch)[-2000:], nr.run(short, x, torch)[-2000:], rtol=1e-5, atol=1e-6)
+
+
+def test_a_file_with_another_loudness_offset_loads_with_a_warning():
+    rng = np.random.default_rng(5)
+    d = {"architecture": "SlimmableContainer", "version": "0.7.0", "sample_rate": 48000,
+         "metadata": {"name": "t3k", "loudness": 99.0},
+         "config": {"submodels": [{"max_value": 0.5, "model": a2(3, rng, 0.3)}, {"max_value": 1, "model": a2(8, rng, 0.3)}]}}
+    c = nr.Capture(d)
+    assert c.warning and abs(c.loudness + c.loud_offset - 99.0) < 1e-9

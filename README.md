@@ -47,6 +47,27 @@ For the optional test builds, cycle meter and diagnostic beep codes, see the [He
 
 Edit NAM presets on the LT. HX Edit can drop NAM blocks when rewriting a preset because the LT build uses model ID 380. If a preset opens empty after switching firmware, leave it unsaved and return to the build it was saved with.
 
+### Four NAM blocks and lighter captures
+
+`--layers` builds the firmware with four NAM blocks instead of one. It ran on a Helix LT on November 12, 2026: all four blocks are listed under **Amp → NAM** and play captures, and a path with two NAM Lite 14 blocks still takes a reverb.
+
+| Block | Captures it plays | DSP cost (of 9,000) |
+| --- | --- | --- |
+| NAM A2 Lite | any A2 Lite (23 layers) | 3,650 |
+| NAM Lite 20 | up to 20 layers | 3,300 |
+| NAM Lite 16 | up to 16 layers | 2,950 |
+| NAM Lite 14 | up to 14 layers | 2,770 |
+
+```sh
+python helix-lt/lt_port.py floor-port "path/to/Helix_LT_v3.80.0_0x7d01f5efb.hxf" --layers
+```
+
+The output is `helix-lt/build/Helix_LT_v3.80.0_NAM4_LAYERS.hxf`, expected MD5 `225a88d936a51203043767e91177a505`. It is for personal use too: never share the file.
+
+- Any capture plays in **NAM A2 Lite** as before, and presets saved with the one-block build keep working: the block keeps preset ID 380.
+- A lighter capture is an A2 Lite trained to use only its first 20, 16 or 14 layers, so the firmware skips the rest. Make one in HX Edit NAM's **Lighter…** panel or with `python tools/nam_refine.py "My Amp.nam" --layers 16`, then convert it as usual. The converter writes the layer count into the `.wav`, and the setup page shows it. Put the capture in the block of its size or a bigger one. In a smaller block it plays silence, so a block never goes over its DSP cost.
+- **Use [HX Edit NAM v0.5.0](https://github.com/andreidevs/hx-edit-nam/releases/tag/v0.5.0) with this build.** Line 6's HX Edit does not know the three new blocks. It shows them as unknown, miscounts the DSP load and greys out blocks that would still fit, such as a reverb next to two NAM Lite 14 blocks. In HX Edit NAM, turn the blocks on once with `setx HX_EDIT_NAM_LAYERS 1` in a command prompt, then restart it. Keep the setting off with the one-block build, which has only NAM A2 Lite.
+
 ## NAM Studio
 
 NAM Studio runs in your browser via a local server at `127.0.0.1`. It processes captures on your computer.

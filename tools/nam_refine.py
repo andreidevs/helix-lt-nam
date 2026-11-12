@@ -13,10 +13,17 @@ and any DI recordings given with --di (better: real playing). The error is ESR a
 a held-out part, before and after; the best weights seen are kept, so a refine never comes out worse
 than the Lite it started from.
 
+--layers P (default 23, all) trains a light capture instead: only the Lite's first P layers, the rest
+of the file's layers all zero (a zero layer adds exactly 0, so the file plays as the P-layer net and is
+still an ordinary A2 Lite; nam2ir writes P into the User IR so a firmware can skip the zero layers). It
+starts from the capture's own Lite's first P layers (from scratch without a Lite); its error before is
+the full Lite's.
+
 usage: nam_refine.py in.nam [-o out.nam] [--quick | --deep | --steps N] [--di guitar.wav ...]
-                            [--seconds 90] [--seed 0]
-Writes an A2 Lite .nam (default: "<name> HD Lite.nam" next to the input), loudness re-measured, the
-capture's metadata kept; tools/nam2ir.py converts it for the unit. Needs torch and neural-amp-modeler.
+                            [--seconds 90] [--seed 0] [--layers 23]
+Writes an A2 Lite .nam (default: "<name> HD Lite.nam" next to the input, "<name> [P layers].nam" for a
+light one), loudness re-measured, the capture's metadata kept; tools/nam2ir.py converts it for the unit.
+Needs torch and neural-amp-modeler.
 """
 import argparse
 import copy
@@ -52,6 +59,26 @@ def lite_config():
               "activation_post_film", "input_mixin_pre_film", "input_mixin_post_film"):
         layer[k] = dict(off)
     return {"head": None, "layers": [layer], "head_scale": 0.02}
+
+
+def prefix_config(cfg, layers):
+    """An A2 Lite config cut to its first `layers` layers (the capture's own: head_scale differs)."""
+    cfg = copy.deepcopy(cfg)
+    la = cfg["layers"][0]
+    for key in ("dilations", "kernel_sizes", "activation", "gating_mode", "secondary_activation"):
+        if isinstance(la.get(key), list):
+            la[key] = la[key][:layers]
+    return cfg
+
+
+def padded(student, full):
+    """The full 23-layer model `full` holding the prefix net `student`: its layers in their places, every
+    later layer's tensors zero (a zero layer leaves the residual stream and the head sum unchanged)."""
+    import torch
+    src = student.state_dict()
+    full.load_state_dict({k: src[k] if k in src else torch.zeros_like(v) for k, v in full.state_dict().items()})
+    full._net._head_scale = student._net._head_scale       # a float, not in the state dict
+    return full
 
 
 def models(d):
@@ -154,11 +181,15 @@ class Capture:
         self.dbu = nam_pack_number(meta.get("input_level_dbu"))
         self.out_dbu = nam_pack_number(meta.get("output_level_dbu"))
         self.loudness = nam_pack_number(meta.get("loudness"))
+        self.loud_offset, self.warning = 0.0, None
         if self.loudness is not None:      # the file's loudness is its big model's: a check that it loaded right
             got = self.teacher._metadata_loudness()
             if abs(got - self.loudness) > 1.0:
-                raise SystemExit(f"{self.name}: the model plays at {got:.1f} dB, its file says {self.loudness:.1f} dB: "
-                                 "a format this tool reads wrong")
+                # some TONE3000 files measure another way (their Full and Lite agree with each other): go on
+                # with the measured loudness, and give a result the file's offset so it plays as the file does
+                self.warning = (f"warning: {self.name}: the model plays at {got:.1f} dB, its file says "
+                                f"{self.loudness:.1f} dB; keeping the file's offset")
+                self.loud_offset, self.loudness = self.loudness - got, got
 
     def kind(self):
         t = self.teacher_dict
@@ -256,7 +287,8 @@ def rig_output(caps, params, x, torch, chain=False):
 
 
 def refine(path, steps, di=(), seconds=90.0, seed=0, log=print, **kw):
-    """(the refined Lite's .nam dict, ESR before, ESR after) for the capture at path."""
+    """(the refined Lite's .nam dict, ESR before, ESR after) for the capture at path (layers=P: a light
+    one, see distil)."""
     cap = Capture(json.load(open(path)), os.path.splitext(os.path.basename(path))[0])
     return distil([cap], [1.0], steps, di, seconds, seed, log, **kw)
 
@@ -269,23 +301,40 @@ def batch_esr(p, t):
 
 
 def distil(caps, levels, steps, di=(), seconds=90.0, seed=0, log=print, lr=None, pre_emph=0.0,
-           segment=SEGMENT, name=None, stop=None, progress=None, chain=False):
+           segment=SEGMENT, name=None, stop=None, progress=None, chain=False, layers=None):
     """(an A2 Lite .nam dict, ESR before, ESR after) trained to sound like the rig: the blend of caps at
     levels, or with chain=True the caps in series (levels then are the trims in dB before each stage).
     One capture is a refine of its own Lite. A blend starts from the loudest capture's Lite, a chain
     from its last stage's (the amp), from scratch when that has none. stop: a threading.Event that ends
-    training early (the best so far is kept); progress(step, steps, esr, best) at each check."""
+    training early (the best so far is kept); progress(step, steps, esr, best) at each check.
+    layers=P (1..23, default all): a light capture, only the first P layers trained (from the Lite's
+    first P), written as a full A2 Lite with the later layers zero; ESR before is then the full Lite's."""
     import torch
     from nam.models import init_from_nam
     from nam.models._from_nam import _init_wavenet
     from nam.models.losses import apply_pre_emphasis_filter, esr
 
+    n = len(nam_pack.KERNEL)
+    layers = n if layers is None else int(layers)
+    if not 1 <= layers <= n:
+        raise ValueError(f"layers {layers}: 1..{n}")
     torch.manual_seed(seed)
     warm = len(caps) - 1 if chain else max(zip(levels, range(len(caps))))[1]
     lite = caps[warm].lite
-    student = init_from_nam(lite) if lite else _init_wavenet(lite_config(), RATE)
+    for c in caps:
+        if c.warning:
+            log(c.warning)
+    if layers == n:
+        student = init_from_nam(lite) if lite else _init_wavenet(lite_config(), RATE)
+    else:
+        student = _init_wavenet(prefix_config(lite["config"] if lite else lite_config(), layers), RATE)
+        if lite:             # the Lite's first P layers, its rechannel and head
+            src = init_from_nam(lite)
+            student.load_state_dict({k: v for k, v in src.state_dict().items() if k in student.state_dict()})
+            student._net._head_scale = src._net._head_scale
+    size = "A2 Lite" if layers == n else f"light A2 Lite ({layers} of {n} layers)"
     log(f"{'chain' if chain else 'teachers'}: {(' > ' if chain else ', ').join(c.name for c in caps)}; "
-        f"student: A2 Lite {'from ' + caps[warm].name + chr(39) + 's Lite' if lite else 'from scratch'}")
+        f"student: {size} {'from ' + caps[warm].name + chr(39) + 's Lite' if lite else 'from scratch'}")
     x, xv = signals(seconds, seed, di)
     t0 = time.time()
     if chain:
@@ -308,13 +357,16 @@ def distil(caps, levels, steps, di=(), seconds=90.0, seed=0, log=print, lr=None,
 
     rf = student.receptive_field
     xt = torch.as_tensor(x)
-    best_e = before = val() if lite else math.inf
+    best_e = start = before = val() if lite else math.inf
     best = copy.deepcopy(student.state_dict())
+    if lite and layers < n:      # a light one is held against the full Lite it stands in for
+        before = esr(run(init_from_nam(lite).eval(), xv, torch), yv).item()
+        log(f"the full Lite: held-out ESR {before:.5f}; its first {layers} layers alone: {start:.5f}")
     if progress and lite:
-        progress(0, steps, before, before)
-    near = before < 0.1          # a Lite already close (a refine) is nudged; one far off (a chain, a weld) is retrained
+        progress(0, steps, start, start)
+    near = start < 0.1          # a Lite already close (a refine) is nudged; one far off (a chain, a weld) is retrained
     if lite and not near:
-        log(f"the starting Lite is {100 * before:.0f}% off the rig: trained as from scratch, kept only if better")
+        log(f"the starting Lite is {100 * start:.0f}% off the rig: trained as from scratch, kept only if better")
     opt = torch.optim.Adam(student.parameters(), lr=lr or (5e-5 if near else 3e-3))
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps)
     student.train()
@@ -347,6 +399,8 @@ def distil(caps, levels, steps, di=(), seconds=90.0, seed=0, log=print, lr=None,
     student.eval()
     out = copy.deepcopy(lite) if lite else {"version": caps[warm].teacher_dict.get("version", "0.5.4"),
                                             "architecture": "WaveNet", "config": lite_config(), "sample_rate": RATE}
+    if layers < n:
+        student = padded(student, init_from_nam(lite).eval() if lite else _init_wavenet(lite_config(), RATE).eval())
     out["weights"] = [float(w) for w in student._export_weights()]
     out["sample_rate"] = RATE
     meta = dict(caps[0].d.get("metadata") or {}) if len(caps) == 1 else {}
@@ -362,9 +416,13 @@ def distil(caps, levels, steps, di=(), seconds=90.0, seed=0, log=print, lr=None,
         if ref is not None:
             meta["input_level_dbu"] = ref
         meta["nam_weld"] = [{"name": c.name, "level": lv} for c, lv in zip(caps, levels)]
+    if layers < n:
+        meta["nam_light"] = {"layers": layers, "of": n}
+        if not name:
+            meta["name"] = f"{meta.get('name') or caps[0].name} [{layers} layers]"
     if name:
         meta["name"] = name
-    meta["loudness"] = student._metadata_loudness()
+    meta["loudness"] = student._metadata_loudness() + (caps[0].loud_offset if len(caps) == 1 else 0.0)
     meta["nam_refine"] = {"teacher_weights": [len(c.teacher_dict["weights"]) for c in caps], "steps": steps,
                           "seed": seed, "held_out_esr_before": None if before == math.inf else before,
                           "held_out_esr_after": best_e}
@@ -385,13 +443,18 @@ def main():
     ap.add_argument("--di", action="append", default=[], help="a 48 kHz DI recording (repeatable)")
     ap.add_argument("--seconds", type=float, default=90.0, help="synthetic guitar to train on")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--layers", type=int, default=len(nam_pack.KERNEL),
+                    help="train a light capture: only the first N of the 23 layers (23, 20, 16, 14)")
     a = ap.parse_args()
+    if not 1 <= a.layers <= len(nam_pack.KERNEL):
+        ap.error(f"--layers: 1..{len(nam_pack.KERNEL)}")
     steps = a.steps or STEPS["standard"]
-    out_path = a.output or os.path.splitext(a.input)[0] + " HD Lite.nam"
-    nam, before, after = refine(a.input, steps, a.di, a.seconds, a.seed)
+    light = a.layers < len(nam_pack.KERNEL)
+    out_path = a.output or os.path.splitext(a.input)[0] + (f" [{a.layers} layers].nam" if light else " HD Lite.nam")
+    nam, before, after = refine(a.input, steps, a.di, a.seconds, a.seed, layers=a.layers)
     with open(out_path, "w") as f:
         json.dump(nam, f)
-    was = "" if before == math.inf else f"{100 * before:.2f}% -> "
+    was = "" if before == math.inf else f"{100 * before:.2f}% (the full Lite) -> " if light else f"{100 * before:.2f}% -> "
     print(f"[+] {out_path}: error against the teacher {was}{100 * after:.2f}% (held-out ESR), "
           f"loudness {nam['metadata']['loudness']:.1f} dB")
 

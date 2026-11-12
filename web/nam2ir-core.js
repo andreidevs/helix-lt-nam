@@ -3,7 +3,8 @@
 // in Node (module.exports) for the check against the Python tool.
 //
 // The .wav is 2,048 samples, 48 kHz, mono, 32-bit float: a header (0.5, -0.5,
-// 3.0, a scale 2^e, 1871 / 1024, the input level, the loudness, 0), then the capture's 1,871 weights
+// 3.0, a scale 2^e, 1871 / 1024, the input level, the loudness, the layer count / 32 or 0
+// for all 23), then the capture's 1,871 weights
 // in the order the kernel loads them, then their silence state (72 words), all
 // divided by 2^e so that every sample is within HX Edit's +-15.8 limit, then zeros.
 (function (root) {
@@ -193,6 +194,14 @@
     return out.concat(s.hs.map(function (v) { return v / 16; }));
   }
 
+  // tools/sharc/nam_lite.py layer_count(): 1 + the last layer with a non-zero weight
+  // (a light capture's layers past its prefix are all zero).
+  function layerCount(w) {
+    var blocks = layerWeights(w).blocks, p = 0;
+    blocks.forEach(function (b, i) { if (b.some(function (x) { return x !== 0; })) p = i + 1; });
+    return p;
+  }
+
   // The 2,048 IR samples as a Float32Array, and the scale exponent.
   function irSamples(w, dbu, loud) {
     var st = stream(w);
@@ -200,16 +209,16 @@
     st.forEach(function (x) { peak = Math.max(peak, Math.abs(x)); });
     var e = 0;
     while (peak / Math.pow(2, e) > 15.5) e++;
-    var s = Math.pow(2, e);
+    var s = Math.pow(2, e), p = layerCount(w);
     var vals = [0.5, -0.5, C, s, N_WEIGHTS / 1024, levelWord(dbu === undefined ? null : dbu),
-                loudWord(loud === undefined ? null : loud), 0].concat(st.map(function (x) { return x / s; }));
+                loudWord(loud === undefined ? null : loud), p === KERNEL.length ? 0 : p / 32].concat(st.map(function (x) { return x / s; }));
     if (vals.length >= IR_SAMPLES) throw new Error("Too many weights for one IR slot.");
     vals.forEach(function (v) {
       if (!(Math.abs(v) < IR_LIMIT)) throw new Error("A sample HX Edit would refuse (" + v + ").");
     });
     var out = new Float32Array(IR_SAMPLES);
     out.set(vals);
-    return { samples: out, exponent: e, peak: peak };
+    return { samples: out, exponent: e, peak: peak, layers: p };
   }
 
   // A 48 kHz mono IEEE-float .wav, as tools/nam2ir.py write_wav().
@@ -266,6 +275,7 @@
         loudness: loud,
         loudDb: loud === null || !loudWord(loud) ? null : LOUD_TARGET - loud,
         sampleRate: rate,
+        layers: ir.layers,
         warnings: []
       }
     };

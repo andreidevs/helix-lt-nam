@@ -155,10 +155,20 @@ def input_trim(dbu):
     return g if g > 0 else 1.0
 
 
+def layer_count(w):
+    """How many leading layers the model uses: 1 + the last layer whose block (conv, bias,
+    mix-in, 1x1, 1x1 bias) has a non-zero weight. A zero layer adds exactly 0 to the
+    residual stream and the head, so a light capture (a P-layer prefix net) is an A2 Lite
+    with layers P..22 all zero."""
+    blocks = layer_weights(w)[0]
+    return max([i + 1 for i, b in enumerate(blocks) if any(b)], default=0)
+
+
 def ir_samples(w, dbu=None, loud=None):
     """The 2,048 float samples of a NAM Lite model as a User IR (tools/nam2ir.py):
     a header (word 5 the capture's input level, level_word(dbu); word 6 its loudness,
-    loud_word(loud)), then the stream divided by 2^e (exact) so that every sample is
+    loud_word(loud); word 7 the layers it uses, layer_count(w) / 32, 0 for all 23, so a
+    firmware can skip the zero ones), then the stream divided by 2^e (exact) so that every sample is
     within HX Edit's +-15.8 limit (the header too: the word count is stored
     / 1024; 1871.0 itself was refused, -8317); the rest 0 (sample 2047 = 0:
     no tail fade)."""
@@ -167,7 +177,9 @@ def ir_samples(w, dbu=None, loud=None):
     e = 0
     while peak / 2.0 ** e > 15.5:
         e += 1
-    head = [0.5, -0.5, float(C), 2.0 ** e, N_WEIGHTS / 1024.0, level_word(dbu), loud_word(loud), 0.0]
+    p = layer_count(w)
+    head = [0.5, -0.5, float(C), 2.0 ** e, N_WEIGHTS / 1024.0, level_word(dbu), loud_word(loud),
+            0.0 if p == len(nam_pack.KERNEL) else p / 32.0]
     out = head + [x / 2.0 ** e for x in st]
     assert len(out) < IR_SAMPLES
     assert max(abs(x) for x in out) < IR_LIMIT, "a sample HX Edit would refuse"

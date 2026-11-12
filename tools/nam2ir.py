@@ -24,7 +24,8 @@ number. A .nam holding several sizes (a SlimmableContainer) gives its 3-channel
 A2 Lite one. web/index.html does the same in a browser.
 
 The layout is tools/sharc/nam_lite.py's
-ir_samples(): 0.5, -0.5, 3.0, a scale 2^e, 1871 / 1024, level, loudness, 0, then the model's
+ir_samples(): 0.5, -0.5, 3.0, a scale 2^e, 1871 / 1024, level, loudness, layers
+(nam_lite.layer_count / 32; 0 for all 23), then the model's
 1,871 weights in the order the kernel loads them, then its silence state (72
 words, each / 16: what the rings hold after silence, so a change of model does
 not pop), all divided by 2^e (exact). A file made before the silence state has

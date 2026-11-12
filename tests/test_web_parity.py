@@ -148,3 +148,20 @@ def test_both_refuse_not_a2_shape(tmp_path, weights, layer):
     src.write_text(nam_json(weights, **layer))
     assert py_convert(src, tmp_path / "py.wav").returncode != 0
     assert js_convert(src, tmp_path / "js.wav")["ok"] is False
+
+
+def test_same_bytes_for_a_light_capture(tmp_path, nam_file, weights):
+    # a 16-layer prefix (layers 16..22 all zero): both write 16 / 32 in word 7
+    import nam_lite
+    import nam_pack
+    w, o = list(weights), nam_lite.C
+    for i, k in enumerate(nam_pack.KERNEL):
+        n = 3 * nam_lite.C + nam_lite.C * nam_lite.C * (k + 1)
+        if i >= 16:
+            w[o:o + n] = [0.0] * n
+        o += n
+    src = nam_file(w)
+    assert py_convert(src, tmp_path / "py.wav").returncode == 0
+    assert js_convert(src, tmp_path / "js.wav") == {"ok": True}
+    py = (tmp_path / "py.wav").read_bytes()
+    assert (tmp_path / "js.wav").read_bytes() == py and struct.unpack("<2048f", py[44:])[7] == 0.5

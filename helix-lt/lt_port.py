@@ -23,7 +23,7 @@ replaced by the LT's, each found by matching the stock Floor and LT images:
 - The .hxf: the LT's data chunk is odd and Line 6 doesn't pad it, so neither does the pack.
 
 usage: lt_port.py <floor-port checkout at FLOOR_PORT> <stock Helix_LT_v3.80.0_0x7d01f5efb.hxf>
-                  [-o out.hxf] [--work DIR]
+                  [-o out.hxf] [--work DIR] [--layers] [--meter | --diag]
 """
 import argparse
 import hashlib
@@ -73,6 +73,9 @@ PATCHES = [
     ("stage_main.py", "SEG0 = (0x10000000, 0x11870)", "SEG0 = (0x10000000, 0x112A8)", 1),
     ("arm_guards.py", "CAVE = 0x10011870", "CAVE = 0x100112A8", 1),
     ("arm_guards.py", "TRAMP = 0x28135070", "TRAMP = 0x2813BA08", 1),
+    ("arm_guards.py", '    return struct.pack("<HHI", 0xF8DF, 0xF000, CAVE | 1)\n',
+     '    assert TRAMP % 4 == 0, "the guard trampoline\'s ldr.w pc needs a 4-aligned address"\n'
+     '    return struct.pack("<HHI", 0xF8DF, 0xF000, CAVE | 1)\n', 1),
     ("arm_guards.py", "AVAIL_RET = 0x2814B7FF", "AVAIL_RET = 0x28152197", 1),
     ("arm_guards.py", "MOVE_RET = 0x2811DE75", "MOVE_RET = 0x281249B9", 1),
     ("arm_guards.py", "C1_RET, C2_RET = 0x28125ADF, 0x28125CF9", "C1_RET, C2_RET = 0x2812C627, 0x2812C841", 1),
@@ -136,8 +139,8 @@ def check_sites(work):
     print(f"[+] title site A {ir_title.SITE_A:#x}: bl {ir_title.RELAY:#x}; relay -> dispatcher {disp & ~1:#x}")
 
 
-def make_tree(src, work):
-    """A copy of the Floor port at `work` with PATCHES applied; each patch must match exactly."""
+def make_tree(src, work, patches=PATCHES):
+    """A copy of the Floor port at `work` with `patches` applied; each patch must match exactly."""
     floor = os.path.join(src, "helix-floor", "floor")
     if not os.path.isfile(os.path.join(floor, "build_floor2.py")):
         sys.exit(f"{src}: not a checkout of the Floor port (no helix-floor/floor/build_floor2.py)")
@@ -145,7 +148,7 @@ def make_tree(src, work):
         shutil.rmtree(work)
     shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git", "build", "__pycache__"))
     texts = {}
-    for name, old, new, n in PATCHES:
+    for name, old, new, n in patches:
         path = os.path.join(work, "helix-floor", "floor", name)
         t = texts.get(path) or open(path, encoding="utf-8").read()
         if t.count(old) != n:
@@ -154,7 +157,7 @@ def make_tree(src, work):
         texts[path] = t.replace(old, new)
     for path, t in texts.items():
         open(path, "w", encoding="utf-8", newline="").write(t)
-    print(f"[+] LT tree at {work}: {len(PATCHES)} patches in {len(texts)} files")
+    print(f"[+] LT tree at {work}: {len(patches)} patches in {len(texts)} files")
 
 
 def roundtrip(work, stock):
@@ -207,11 +210,18 @@ def main():
     ap.add_argument("--meter", action="store_true", help="the Floor port's cycle-meter test image (nam_floor5m)")
     ap.add_argument("--diag", action="store_true", help="the Floor port's beep-code test image (nam_floor5d)")
     ap.add_argument("--staged", action="store_true", help="also the two bring-up images (see staged())")
+    ap.add_argument("--layers", action="store_true",
+                    help="light captures (lt_layers.py): NAM blocks of 23 / 20 / 16 / 14 layers, each its own DSP cost")
     a = ap.parse_args()
+    if a.layers:
+        import lt_layers
+        os.environ.update(NAM_GATHER="1", NAM_LAYERS="1")
+        a.output = a.output.replace("NAM2_PERSONAL", "NAM4_LAYERS" + "_METER" * a.meter + "_DIAG" * a.diag)
+        a.work = a.work if a.work != ap.get_default("work") else a.work + "_layers"
     stock, out, work = (os.path.abspath(p) for p in (a.stock, a.output, a.work))
     if hashlib.md5(open(stock, "rb").read()).hexdigest() != LT_MD5:
         sys.exit(f"{stock}: not the stock Helix LT 3.80.0 file (MD5 {LT_MD5})")
-    make_tree(os.path.abspath(a.floor_port), work)
+    make_tree(os.path.abspath(a.floor_port), work, PATCHES + (lt_layers.PATCHES if a.layers else []))
     roundtrip(work, stock)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     flags = ["--meter"] * a.meter + ["--diag"] * a.diag

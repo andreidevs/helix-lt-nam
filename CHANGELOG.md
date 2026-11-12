@@ -2,6 +2,11 @@
 
 Major changes, newest first. The repository has no version numbers, so each entry is dated and names its commit. Status labels follow the README: "ran on" means a person ran that build on that unit.
 
+## 2026-11-12
+
+- **Helix LT: four NAM blocks** ([README](README.md#four-nam-blocks-and-lighter-captures), [technical guide](helix-lt/README.md)). `helix-lt/lt_port.py --layers` builds `Helix_LT_v3.80.0_NAM4_LAYERS.hxf` (MD5 225a88d9): NAM A2 Lite, NAM Lite 20, NAM Lite 16 and NAM Lite 14, at 3,650, 3,300, 2,950 and 2,770 of a DSP's 9,000. The kernel skips the layers a light capture leaves empty, and each block plays silence for a capture with more layers than it allows. It ran on a Helix LT, together with HX Edit NAM v0.5.0, which knows the new blocks. The 23-layer cost was measured on the LT: 36.2% of a DSP, 0.4% more than the one-block build.
+- **Lighter captures.** `tools/nam_refine.py --layers P` trains a capture's A2 Lite down to its first P layers against its own bigger model. The converter (`tools/nam2ir.py` and the web page) writes P into the `.wav`, and the setup page shows which block it needs. A light capture plays the same on any build; only `--layers` builds save DSP with it.
+
 ## 2026-11-08
 
 - **Helix LT** (`c9b90bc`, [helix-lt/](helix-lt/README.md)). `helix-lt/lt_port.py` builds savedadodo's Helix Floor port with the LT's addresses. The build 8330973f ran on a Helix LT: it boots, Amp → NAM → NAM A2 Lite is in the menu, a capture plays. The first build (ecb8d773) showed a blue screen at boot: on the LT one of the IR-title patch sites is not 4-aligned, so the jump there read a wrong address; it now goes through a `bl` and a relay. The canary and the two bring-up images also ran on that LT. Two NAM blocks per path and the real DSP load aren't confirmed on an LT yet.

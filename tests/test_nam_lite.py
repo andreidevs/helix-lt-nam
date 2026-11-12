@@ -38,6 +38,24 @@ def test_ir_samples_header_and_size(weights):
     assert s[-1] == 0                               # no tail fade in HX Edit
 
 
+def test_ir_samples_word7_layer_count(weights):
+    # a full model: word 7 stays 0 (every capture converts as before); a 16-layer prefix
+    # (layers 16..22 all zero): 16 / 32, the rest of the stream the same words
+    assert floats(nam_lite.ir_samples(weights))[7] == 0.0
+    w = list(weights)
+    o = nam_lite.C
+    for i, k in enumerate(nam_pack.KERNEL):
+        n = 3 * nam_lite.C + nam_lite.C * nam_lite.C * (k + 1)    # conv, bias, mix-in, 1x1, 1x1 bias
+        if i >= 16:
+            w[o:o + n] = [0.0] * n
+        o += n
+    assert nam_lite.layer_count(w) == 16
+    a, b = nam_lite.ir_samples(w), floats(nam_lite.ir_samples(w))
+    assert b[7] == 0.5
+    st = nam_lite.stream(w)
+    assert [x * b[3] for x in b[8: 8 + len(st)]] == [ssim.b2f(ssim.f2b(x)) for x in st] and len(a) == nam_lite.IR_SAMPLES
+
+
 def test_ir_samples_within_hx_edit_limit(weights):
     assert max(abs(x) for x in floats(nam_lite.ir_samples(weights))) < nam_lite.IR_LIMIT
 

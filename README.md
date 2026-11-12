@@ -4,7 +4,7 @@
 
 **helix-lt-nam** adds a Neural Amp Modeler (NAM) A2 Lite block to Line 6 Helix LT firmware 3.80.0. The block runs captures on the Helix LT's DSP. The project also includes **NAM Studio**, a local app for blending, chaining, refining and converting captures.
 
-[Установка и восстановление на русском](helix-lt/INSTALL_RU.md) · [Helix LT technical guide](helix-lt/README.md) · [NAM Studio](#nam-studio)
+[Установка и восстановление на русском](helix-lt/INSTALL_RU.md) · [Helix LT technical guide](helix-lt/README.md) · [NAM Pedal and lighter captures: how they work](docs/light-nam.md) · [NAM Studio](#nam-studio) · [HX Edit NAM](https://github.com/andreidevs/hx-edit-nam)
 
 ## Helix LT
 
@@ -66,7 +66,19 @@ The output is `helix-lt/build/Helix_LT_v3.80.0_NAM4_LAYERS.hxf`, expected MD5 `2
 
 - Any capture plays in **NAM A2 Lite** as before, and presets saved with the one-block build keep working: the block keeps preset ID 380.
 - A lighter capture is an A2 Lite trained to use only its first 20, 16 or 14 layers, so the firmware skips the rest. Make one in HX Edit NAM's **Lighter…** panel or with `python tools/nam_refine.py "My Amp.nam" --layers 16`, then convert it as usual. The converter writes the layer count into the `.wav`, and the setup page shows it. Put the capture in the block of its size or a bigger one. In a smaller block it plays silence, so a block never goes over its DSP cost.
-- **Use [HX Edit NAM v0.5.0](https://github.com/andreidevs/hx-edit-nam/releases/tag/v0.5.0) with this build.** Line 6's HX Edit does not know the three new blocks. It shows them as unknown, miscounts the DSP load and greys out blocks that would still fit, such as a reverb next to two NAM Lite 14 blocks. In HX Edit NAM, turn the blocks on once with `setx HX_EDIT_NAM_LAYERS 1` in a command prompt, then restart it. Keep the setting off with the one-block build, which has only NAM A2 Lite.
+- **Use [HX Edit NAM v0.6.0](https://github.com/andreidevs/hx-edit-nam/releases/tag/v0.6.0) with this build.** Line 6's HX Edit does not know the new blocks. It shows them as unknown, miscounts the DSP load and greys out blocks that would still fit, such as a reverb next to two NAM Lite 14 blocks. HX Edit NAM asks at start which firmware is installed and shows its blocks.
+
+### NAM Pedal
+
+`--pedal` builds the four blocks and a fifth one, **NAM Pedal**, for overdrives and boosts. It plays a small pedal model instead of a WaveNet: 7.7% of a DSP (cost 850 of 9,000) against 36% for a NAM block. `tools/nam_pedal.py` fits the model to a NAM pedal capture in about 30 seconds, with 0.4-6% error on 13 popular TONE3000 pedals. Amp captures lose much more: use a NAM block for them. [How NAM Pedal and lighter captures work](docs/light-nam.md)
+
+```sh
+python helix-lt/lt_port.py floor-port "path/to/Helix_LT_v3.80.0_0x7d01f5efb.hxf" --pedal
+```
+
+The output is `helix-lt/build/Helix_LT_v3.80.0_NAM5_PEDAL.hxf`, expected MD5 `1c83ee3ae2710caeb0105c6cc7175985`. It is for personal use too: never share the file. NAM Pedal ran on a Helix LT; two NAM blocks and a NAM Pedal block on one DSP path are not confirmed yet.
+
+HX Edit NAM v0.6.0 converts pedals for this block when you import a capture or pick one on TONE3000 (the **TONE3000 Pedal** tile), with the training built in.
 
 ## NAM Studio
 

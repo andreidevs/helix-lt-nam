@@ -2,6 +2,13 @@
 
 Major changes, newest first. The repository has no version numbers, so each entry is dated and names its commit. Status labels follow the README: "ran on" means a person ran that build on that unit.
 
+## 2026-11-13
+
+- **Helix LT: NAM Pedal** ([README](README.md#nam-pedal), [how it works](docs/light-nam.md)). `helix-lt/lt_port.py --pedal` builds `Helix_LT_v3.80.0_NAM5_PEDAL.hxf` (MD5 1c83ee3a): the four NAM blocks and a fifth, NAM Pedal, which plays a pedal model (FIR 64 → curve → FIR 64 → curve → FIR 48 → curve → FIR 256, 627 coefficients, no DMA). Measured on a Helix LT: 11,536 cycles a call, 7.7% of a DSP; DSP cost 850. A NAM block refuses a pedal model and NAM Pedal refuses a NAM capture.
+- **Pedal converter** (`tools/nam_pedal.py`). Fits a pedal model to a NAM pedal capture in about 30 s, against the capture's own biggest model: variable projection (the last FIR solved exactly on every batch), a loss weighted across nine octave bands, then a 1/3-octave EQ match. 0.4-1.7% ESR on a Benson preamp, 0.4-6% on 13 TONE3000 pedals. It fits with NAM's v3 reamp DI, now in `tools/nam_v3_input.wav`.
+- `tools/nam_refine.py` runs without librosa and NAM's trainer, so HX Edit NAM's bundled Python can train.
+- Works with [HX Edit NAM v0.6.0](https://github.com/andreidevs/hx-edit-nam/releases/tag/v0.6.0), which converts captures for NAM Pedal and the lighter blocks on import and on TONE3000.
+
 ## 2026-11-12
 
 - **Helix LT: four NAM blocks** ([README](README.md#four-nam-blocks-and-lighter-captures), [technical guide](helix-lt/README.md)). `helix-lt/lt_port.py --layers` builds `Helix_LT_v3.80.0_NAM4_LAYERS.hxf` (MD5 225a88d9): NAM A2 Lite, NAM Lite 20, NAM Lite 16 and NAM Lite 14, at 3,650, 3,300, 2,950 and 2,770 of a DSP's 9,000. The kernel skips the layers a light capture leaves empty, and each block plays silence for a capture with more layers than it allows. It ran on a Helix LT, together with HX Edit NAM v0.5.0, which knows the new blocks. The 23-layer cost was measured on the LT: 36.2% of a DSP, 0.4% more than the one-block build.

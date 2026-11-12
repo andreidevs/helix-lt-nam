@@ -79,6 +79,31 @@ file, gives `f4338695c5fa965f9100a0d82e632b7e`, its NOMASK_C3600 image, the one 
 The LT build changes the same four entries, with the same steady KernelCheck count (34,874
 instructions a call), preset ID (380) and DSP cost (3,600); Entry 2 has 5,384 bytes spare.
 
+### NAM Pedal (`--pedal`)
+
+`lt_port.py --pedal` implies `--layers` and adds `helix-lt/lt_pedal.py`'s replacements (kernel flag
+`NAM_PEDAL=1`). It builds `Helix_LT_v3.80.0_NAM5_PEDAL.hxf` (MD5 `1c83ee3ae2710caeb0105c6cc7175985`;
+the meter build `..._NAM5_PEDAL_METER.hxf`, `ea5e2ac5e408029b6fef052ac00f1991`). How the model and its
+converter work: [docs/light-nam.md](../docs/light-nam.md).
+
+| Block | Preset ID | Instance tag (P_LIM) | DSP cost | Measured on the LT |
+| --- | --- | --- | --- | --- |
+| NAM Pedal (`HD2_AmpNAMPedal`) | 768 | `0x4E4C00FE` | 850 | 11,536 cycles a call (median), 7.7%; 12,336 (8.2%) for 99% |
+
+- **Model.** FIR 64 → curve → FIR 64 → curve → FIR 48 → curve → FIR 256; a curve is 65 knots on
+  [−4, 4], linear between, the end segments continued. 627 coefficients after the IR header, whose
+  word 4 is 627 / 1024 instead of 1871 / 1024: NAM blocks and older kernels refuse a pedal model, and the
+  pedal block refuses a NAM capture.
+- **Memory.** The block takes no NAM slot. Its slot state is a pseudo-slot at instance DM + 146 (model
+  check, crossfade, tone stack and knobs as on the NAM path), the coefficients after it, the four filter
+  histories (432 words) in its instance PM. No DMA, no far rings.
+- **Code space.** Region R1 was nearly full: register saves are packed in SIMD pairs, and the report
+  counters KernelCheck does not read (no-slot, no-SDR, DMA, ICE) were removed.
+- **Checks.** The simulator runs the block bit for bit against a float32 reference (`ped_ref`) and checks
+  that every register is preserved. Steady KernelCheck count: 31,366 (the build sets the limit to
+  60,000). A model switch costs about 18,700 cycles once.
+- Not yet confirmed on the unit: two NAM blocks and a NAM Pedal block on one DSP path.
+
 ## First day with an LT, in this order
 
 Each step needs the previous one to have worked. All images go in with Line 6 Updater, Offline Mode.

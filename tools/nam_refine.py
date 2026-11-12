@@ -39,6 +39,21 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sharc"))
 import nam_pack  # noqa: E402
 
+
+def _lean_nam():
+    """Let `import nam` work with only torch, numpy, scipy, pydantic, wavio and tqdm (HX Edit NAM's bundled
+    Python): nam imports its data loader (librosa) and its trainer (lightning) on import, and neither is used
+    here, so where they are not installed they become empty modules."""
+    import importlib.util
+    import types
+    if importlib.util.find_spec("librosa") is None:
+        sys.modules.setdefault("librosa", types.ModuleType("librosa"))
+    if importlib.util.find_spec("pytorch_lightning") is None and importlib.util.find_spec("lightning") is None:
+        sys.modules.setdefault("nam.train", types.ModuleType("nam.train"))
+
+
+_lean_nam()
+
 RATE = 48000
 STEPS = {"quick": 800, "standard": 3000, "deep": 10000}
 SEGMENT, BATCH = 4096, 16

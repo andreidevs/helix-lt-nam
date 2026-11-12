@@ -23,7 +23,7 @@ replaced by the LT's, each found by matching the stock Floor and LT images:
 - The .hxf: the LT's data chunk is odd and Line 6 doesn't pad it, so neither does the pack.
 
 usage: lt_port.py <floor-port checkout at FLOOR_PORT> <stock Helix_LT_v3.80.0_0x7d01f5efb.hxf>
-                  [-o out.hxf] [--work DIR] [--layers] [--meter | --diag]
+                  [-o out.hxf] [--work DIR] [--layers | --pedal] [--meter | --diag]
 """
 import argparse
 import hashlib
@@ -212,16 +212,26 @@ def main():
     ap.add_argument("--staged", action="store_true", help="also the two bring-up images (see staged())")
     ap.add_argument("--layers", action="store_true",
                     help="light captures (lt_layers.py): NAM blocks of 23 / 20 / 16 / 14 layers, each its own DSP cost")
+    ap.add_argument("--pedal", action="store_true",
+                    help="--layers and a fifth block, NAM Pedal (lt_pedal.py): pedal models from tools/nam_pedal.py")
     a = ap.parse_args()
+    a.layers = a.layers or a.pedal
+    extra = []
     if a.layers:
         import lt_layers
         os.environ.update(NAM_GATHER="1", NAM_LAYERS="1")
-        a.output = a.output.replace("NAM2_PERSONAL", "NAM4_LAYERS" + "_METER" * a.meter + "_DIAG" * a.diag)
-        a.work = a.work if a.work != ap.get_default("work") else a.work + "_layers"
+        name = "NAM5_PEDAL" if a.pedal else "NAM4_LAYERS"
+        a.output = a.output.replace("NAM2_PERSONAL", name + "_METER" * a.meter + "_DIAG" * a.diag)
+        a.work = a.work if a.work != ap.get_default("work") else a.work + ("_pedal" if a.pedal else "_layers")
+        extra = lt_layers.PATCHES
+    if a.pedal:
+        import lt_pedal
+        os.environ["NAM_PEDAL"] = "1"
+        extra = extra + lt_pedal.PATCHES
     stock, out, work = (os.path.abspath(p) for p in (a.stock, a.output, a.work))
     if hashlib.md5(open(stock, "rb").read()).hexdigest() != LT_MD5:
         sys.exit(f"{stock}: not the stock Helix LT 3.80.0 file (MD5 {LT_MD5})")
-    make_tree(os.path.abspath(a.floor_port), work, PATCHES + (lt_layers.PATCHES if a.layers else []))
+    make_tree(os.path.abspath(a.floor_port), work, PATCHES + extra)
     roundtrip(work, stock)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     flags = ["--meter"] * a.meter + ["--diag"] * a.diag

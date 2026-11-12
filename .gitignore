@@ -13,3 +13,6 @@ __pycache__/
 floor-port/
 !tools/ramboot/*.bin
 tools/*.hex
+
+# NAM's standard reamp file (v3 input.wav): the pedal converter fits on its guitar/bass DI
+!tools/nam_v3_input.wav
